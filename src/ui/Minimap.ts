@@ -102,7 +102,7 @@ export class Minimap {
     else if (!radarId) {
       title = 'RADAR UNAVAILABLE';
       sub = 'No radar support for this operation';
-    } else sub = `Build a ${BUILDINGS[radarId].name}`;
+    } else sub = `Build ${/^[AEIOU]/i.test(BUILDINGS[radarId].name) ? 'an' : 'a'} ${BUILDINGS[radarId].name}`;
     const key = title + sub;
     if (key === this.offlineKey) return;
     this.offlineKey = key;

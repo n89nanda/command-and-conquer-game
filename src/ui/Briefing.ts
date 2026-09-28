@@ -177,6 +177,9 @@ export class Briefing {
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
+        // let focused buttons (BACK / SKIP) handle their own activation
+        const f = document.activeElement as HTMLElement | null;
+        if (f && f.tagName === 'BUTTON' && !f.classList.contains('primary')) return;
         e.preventDefault();
         begin();
       } else if (e.key === 'Escape') {

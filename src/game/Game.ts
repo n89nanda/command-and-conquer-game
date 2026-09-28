@@ -117,6 +117,9 @@ export class Game {
   missionScript: { update(dt: number): void } | null = null;
   cinematic = false;
   alwaysRadar = false;
+  private endTimer = 0;
+  private lastEndCheck = -1;
+  private lastRadarCheck = -1;
   private noBaseSince = new Map<Player, number>();
   private revealedStragglers = new Set<Player>();
   /** Two-finger scroll pans (trackpad) instead of zooming (mouse wheel). */
@@ -202,7 +205,10 @@ export class Game {
     for (const [t, n, f, o] of this.listeners) t.removeEventListener(n, f, o);
     this.listeners = [];
     this.renderer.detachWorld();
+    if (this.endTimer) clearTimeout(this.endTimer);
+    this.endTimer = 0;
     this.renderer.renderer.dispose();
+    this.renderer.renderer.forceContextLoss();
     this.renderer.canvas.remove();
     this.overlay.remove();
   }
@@ -223,7 +229,8 @@ export class Game {
     }
     this.updateCamera(dt);
     // campaign operations that don't allow a radar structure give the player the minimap for free
-    if (this.missionScript && !this.alwaysRadar && this.world.tickCount % 30 === 0) {
+    if (this.missionScript && !this.alwaysRadar && this.world.time - this.lastRadarCheck >= 1) {
+      this.lastRadarCheck = this.world.time;
       const radarId = Object.values(BUILDINGS).find((b) => b.radar && b.faction === this.me.faction)?.id;
       if (radarId && !this.me.isVisibleItem(radarId)) this.alwaysRadar = true;
     }
@@ -244,7 +251,9 @@ export class Game {
   // =================================================================== win / loss
   private checkEnd() {
     if (this.missionScript) return; // missions decide themselves
-    if (this.world.tickCount % 30 !== 0) return;
+    // once per second of game time (robust to any number of ticks per frame)
+    if (this.world.time - this.lastEndCheck < 1) return;
+    this.lastEndCheck = this.world.time;
     const alive = (p: Player) => this.world.buildings.some((b) => b.owner === p && !b.def.wall && b.def.faction !== 'both') || this.world.units.some((u) => u.owner === p && !u.def.harvester);
     for (const p of this.world.players) {
       if (p.isNeutral || p.defeated) continue;
@@ -289,7 +298,10 @@ export class Game {
     audio.speak(victory ? 'Mission accomplished.' : 'Mission failed.', 'announcer', { faction: this.me.faction, priority: 5 });
     audio.play(victory ? 'victory' : 'defeat');
     audio.playMusic(victory ? 'victory' : 'defeat');
-    setTimeout(() => this.hooks.onEnd?.(victory, this.world), 3500);
+    this.endTimer = window.setTimeout(() => {
+      this.endTimer = 0;
+      if (this.running) this.hooks.onEnd?.(victory, this.world);
+    }, 3500);
   }
 
   announce(text: string, speak = true, color = '#9fe8ff') {
@@ -557,6 +569,7 @@ export class Game {
       e.preventDefault();
       return;
     }
+    if (this.ended) return;
     if (e.key === 'Escape') {
       if (this.mode !== 'normal') this.setMode('normal');
       else this.setPaused(!this.paused);
@@ -569,8 +582,9 @@ export class Game {
       return;
     }
     if (this.paused) return;
-    if (/^[0-9]$/.test(e.key)) {
-      const n = Number(e.key);
+    const digit = /^Digit[0-9]$/.test(e.code) ? e.code.slice(5) : /^[0-9]$/.test(e.key) ? e.key : null;
+    if (digit !== null) {
+      const n = Number(digit);
       e.preventDefault();
       if (mod) {
         this.groups.set(n, this.selection.filter((s) => s.owner === this.me && s.kind === 'unit').map((s) => s.id));

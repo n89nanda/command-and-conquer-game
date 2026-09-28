@@ -991,6 +991,11 @@ export class App {
       });
       this.samples.push({ t: w.time, v });
     }
+    if (this.tipsOn && lsGet('riftfall.skirmishTips') === '0' && this.tipStep !== 'done') {
+      // player switched tips off in Options mid-game
+      this.tipsOn = false;
+      this.hud?.showHint(null);
+    }
     if (this.tipsOn && this.ctx?.kind === 'skirmish' && !g.paused) {
       this.tipT -= dt;
       if (this.tipT <= 0) {
@@ -1027,7 +1032,7 @@ export class App {
     else if (!own('refinery')) tip = step('refinery', 'refinery', 'Now build a %.', 'It comes with a free <b>Harvester</b> that turns Riftite into credits.');
     else if (!own('barracks')) tip = step('barracks', 'barracks', 'Build a % to train infantry.', '');
     else if (!own('factory')) tip = step('factory', 'factory', 'Build a % to produce tanks and vehicles.', '');
-    else if (!own('radar')) tip = step('radar', 'radar', 'Build a % to bring the radar minimap online.', '');
+    else if (!own('radar')) tip = step('radar', 'radar', `Build ${/^[AEIOU]/i.test(name('radar')) ? 'an' : 'a'} % to bring the radar minimap online.`, '');
     else {
       tip = { key: 'done', html: 'Base established. Train an army, then press <kbd>A</kbd> and click to <b>attack-move</b> into the enemy.' };
       if (this.tipStep !== 'done') {
@@ -1148,6 +1153,7 @@ export class App {
   }
 
   private teardownGame() {
+    this.hidePause();
     this.game?.stop();
     this.hud?.destroy();
     this.game = null;

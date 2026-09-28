@@ -202,6 +202,7 @@ export class Attract {
     window.removeEventListener('resize', this.onResize);
     this.renderer.detachWorld();
     this.renderer.renderer.dispose();
+    this.renderer.renderer.forceContextLoss();
     this.renderer.canvas.remove();
   }
 }
