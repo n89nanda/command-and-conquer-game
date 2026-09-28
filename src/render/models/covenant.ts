@@ -1,7 +1,7 @@
 /** Rift Covenant ground vehicles: sleek & menacing gunmetal/black, red trim, red-orange + teal Riftite glow. */
 import * as THREE from 'three';
 import {
-  B, P, V3, Template, TrackOpts, finalizeTemplate, node, tracks, treadNode, wheel, vehicleAnim, strut, spike, byName, rng,
+  B, P, V3, Template, TrackOpts, finalizeTemplate, node, tracks, treadNode, wheel, vehicleAnim, strut, spike, byName, rng, riftCrystal,
 } from './kit';
 
 function shell(): { root: THREE.Group; body: THREE.Group } {
@@ -43,7 +43,7 @@ function scorpion(team: THREE.Color): Template {
   b.hull('paint', P.cGun, mz([[-0.4, 0.12, 0.2], [0.28, 0.12, 0.2], [0.47, 0.12, 0], [-0.38, 0.24, 0.14], [0.18, 0.24, 0.12], [0.36, 0.2, 0]]));
   for (const s of [1, -1]) {
     fender(b, s, -0.42, 0.44, 0.19, 0.3, 0.1, 0.2, P.cGun);
-    b.box('paint', team, 0.34, 0.01, 0.05, -0.06, 0.2, s * 0.245); // team blades on fenders
+    b.box('paint', team, 0.42, 0.01, 0.08, -0.04, 0.2, s * 0.245); // team blades on fenders
     b.box('paint', P.cRed, 0.5, 0.012, 0.012, 0.0, 0.176, s * 0.296); // red trim edge
     b.box('e:teal', 0, 0.2, 0.012, 0.006, -0.12, 0.14, s * 0.3); // teal side glow strip
   }
@@ -57,11 +57,11 @@ function scorpion(team: THREE.Color): Template {
   }
   // nose spine + red chevrons
   b.box('paint', P.cRed, 0.16, 0.012, 0.02, 0.3, 0.225, 0, 0, 0, -0.2);
-  b.box('e:red', 0, 0.02, 0.018, 0.1, 0.44, 0.13, 0);
+  b.box('e:orange', 0, 0.02, 0.018, 0.1, 0.44, 0.13, 0);
   // rear engine glow vents
   b.box('paint', P.cBlack, 0.03, 0.08, 0.26, -0.405, 0.18, 0);
-  b.box('e:red', 0, 0.01, 0.03, 0.08, -0.42, 0.18, 0.07);
-  b.box('e:red', 0, 0.01, 0.03, 0.08, -0.42, 0.18, -0.07);
+  b.box('e:orange', 0, 0.01, 0.03, 0.08, -0.42, 0.18, 0.07);
+  b.box('e:orange', 0, 0.01, 0.03, 0.08, -0.42, 0.18, -0.07);
   // scorpion tail: segmented arc over the rear with glowing sting
   const tail: V3[] = [[-0.32, 0.24, 0.0], [-0.44, 0.34, 0], [-0.46, 0.47, 0], [-0.38, 0.57, 0], [-0.26, 0.6, 0], [-0.16, 0.56, 0]];
   for (let i = 0; i < tail.length - 1; i++) {
@@ -69,13 +69,13 @@ function scorpion(team: THREE.Color): Template {
     b.sphere('paint', P.cRed, 0.028 - i * 0.003, tail[i + 1][0], tail[i + 1][1], 0, 1, 1, 1, 6, 4);
   }
   spike(b, 'paint', P.cRed, -0.16, 0.56, 0, 0.1, 0.022, 0, -2.3);
-  b.sphere('e:red', 0, 0.022, -0.13, 0.52, 0, 1, 1, 1, 6, 4);
+  b.sphere('e:orange', 0, 0.022, -0.13, 0.52, 0, 1, 1, 1, 6, 4);
   body.add(b.meshes());
   body.add(treadNode(tr));
 
   const t = new B({ aoBase: 0.24, aoHeight: 0.1, aoMin: 0.7 });
   t.hull('paint', P.cGunLt, mz([[-0.16, 0, 0.13], [0.08, 0, 0.14], [0.2, 0, 0.05], [-0.14, 0.09, 0.09], [0.06, 0.09, 0.09], [0.15, 0.07, 0.03]]));
-  t.box('paint', team, 0.1, 0.01, 0.12, -0.05, 0.093, 0);
+  t.box('paint', team, 0.16, 0.01, 0.17, -0.04, 0.093, 0);
   t.box('paint', P.cRed, 0.012, 0.012, 0.18, 0.07, 0.09, 0);
   for (const s of [1, -1]) spike(t, 'paint', P.cBlack, -0.12, 0.04, s * 0.12, 0.1, 0.02, s * 1.1, 1.0);
   t.box('paint', P.cRed, 0.02, 0.012, 0.05, 0.13, 0.07, 0.06);
@@ -104,7 +104,7 @@ function inferno(team: THREE.Color): Template {
   for (const s of [1, -1]) {
     fender(b, s, -0.47, 0.47, 0.2, 0.34, 0.1, 0.21, P.cGun);
     b.box('paint', P.cRed, 0.6, 0.014, 0.014, -0.02, 0.185, s * 0.335);
-    b.box('paint', team, 0.3, 0.01, 0.06, 0.18, 0.212, s * 0.27);
+    b.box('paint', team, 0.44, 0.01, 0.09, 0.1, 0.212, s * 0.275);
     spike(b, 'paint', P.cBlack, 0.36, 0.18, s * 0.33, 0.12, 0.025, 0, s * -1.3);
   }
   // fuel tanks on the back deck
@@ -116,7 +116,7 @@ function inferno(team: THREE.Color): Template {
     b.box('paint', P.cBlack, 0.04, 0.09, 0.2, -0.3, 0.29, s * 0.1);
     b.box('paint', P.cBlack, 0.04, 0.09, 0.2, -0.06, 0.29, s * 0.1);
   }
-  b.box('paint', team, 0.2, 0.012, 0.07, -0.18, 0.455, 0);
+  b.box('paint', team, 0.3, 0.012, 0.09, -0.18, 0.455, 0);
   // armoured nozzle sponsons
   for (const s of [1, -1]) {
     b.cbox('paint', P.cBlack, 0.16, 0.09, 0.1, 0.02, 0.36, 0.25, s * 0.1);
@@ -160,7 +160,7 @@ function shade(team: THREE.Color): Template {
     strut(b, 'paint', P.cBlack, [-0.18, 0.2, s * 0.14], [-0.14, 0.26, s * 0.15], 0.03);
     b.cbox('paint', P.cBlack, 0.24, 0.07, 0.09, 0.015, -0.1, 0.28, s * 0.15);
     b.box('paint', P.cRed, 0.02, 0.072, 0.092, 0.0, 0.28, s * 0.15);
-    for (const dz of [-0.022, 0.022]) b.cylX('e:red', 0, 0.014, 0.014, 0.01, 6, 0.022, 0.28, s * 0.15 + dz);
+    for (const dz of [-0.022, 0.022]) b.cylX('e:orange', 0, 0.014, 0.014, 0.01, 6, 0.022, 0.28, s * 0.15 + dz);
   }
   body.add(b.meshes());
   body.add(treadNode(tr));
@@ -181,7 +181,7 @@ function prism(team: THREE.Color): Template {
   for (const s of [1, -1]) {
     fender(b, s, -0.52, 0.53, 0.24, 0.38, 0.11, 0.23, P.cGun);
     b.box('paint', P.cRed, 0.66, 0.014, 0.014, -0.03, 0.2, s * 0.375);
-    b.box('paint', team, 0.36, 0.01, 0.07, -0.12, 0.232, s * 0.31);
+    b.box('paint', team, 0.5, 0.01, 0.1, -0.08, 0.232, s * 0.31);
     b.box('e:teal', 0, 0.26, 0.012, 0.008, 0.1, 0.15, s * 0.382);
     spike(b, 'paint', P.cBlack, -0.44, 0.2, s * 0.36, 0.14, 0.03, 0, s * -1.2);
   }
@@ -195,7 +195,7 @@ function prism(team: THREE.Color): Template {
   const t = new B({ aoBase: 0.32, aoHeight: 0.15, aoMin: 0.7 });
   t.cyl('paint', P.cBlack, 0.2, 0.22, 0.05, 12, 0, 0.025, 0);
   t.hull('paint', P.cGunLt, mz([[-0.22, 0.04, 0.14], [0.05, 0.04, 0.17], [-0.2, 0.12, 0.1], [0.02, 0.12, 0.12]]));
-  t.box('paint', team, 0.14, 0.01, 0.16, -0.1, 0.125, 0);
+  t.box('paint', team, 0.2, 0.01, 0.2, -0.1, 0.125, 0);
   // cradle arms (curved forks)
   for (const s of [1, -1]) {
     strut(t, 'paint', P.cGun, [0.0, 0.08, s * 0.15], [0.12, 0.2, s * 0.13], 0.05, 0.04, 0.01);
@@ -208,6 +208,7 @@ function prism(team: THREE.Color): Template {
   // crystal lens
   const c = new THREE.OctahedronGeometry(0.1, 0);
   t.add(c, 'crystal', 0, new THREE.Matrix4().compose(new THREE.Vector3(0.16, 0.2, 0), new THREE.Quaternion(), new THREE.Vector3(1.9, 0.62, 0.62)));
+  t.add(new THREE.OctahedronGeometry(0.035, 0), 'crystalCore', 0, new THREE.Matrix4().compose(new THREE.Vector3(0.33, 0.2, 0), new THREE.Quaternion(), new THREE.Vector3(1.6, 1, 1)));
   const turret = node('turret', t, -0.04, 0.32, 0);
   body.add(turret);
   const gun = new THREE.Group();
@@ -230,7 +231,7 @@ function raider(team: THREE.Color): Template {
   // fairing body
   b.hull('paint', P.cGun, mz([[-0.26, 0.14, 0.06], [0.1, 0.13, 0.07], [0.24, 0.2, 0.04], [0.28, 0.24, 0], [-0.22, 0.24, 0.05], [0.12, 0.27, 0.06], [-0.3, 0.2, 0.03]]));
   b.hull('paint', team, mz([[0.1, 0.24, 0.065], [0.26, 0.24, 0.03], [0.12, 0.28, 0.06], [0.22, 0.28, 0.02], [0.28, 0.25, 0]]));
-  b.box('e:red', 0, 0.012, 0.02, 0.05, 0.285, 0.225, 0);
+  b.box('e:orange', 0, 0.012, 0.02, 0.05, 0.285, 0.225, 0);
   b.box('paint', P.cRed, 0.3, 0.01, 0.012, -0.04, 0.2, 0.068);
   b.box('paint', P.cRed, 0.3, 0.01, 0.012, -0.04, 0.2, -0.068);
   // side rocket pods
@@ -248,7 +249,7 @@ function raider(team: THREE.Color): Template {
   b.cbox('paint', team, 0.05, 0.03, 0.04, 0.01, 0.01, 0.385, 0.07);
   b.cbox('paint', team, 0.05, 0.03, 0.04, 0.01, 0.01, 0.385, -0.07);
   b.sphere('paint', P.cBlack, 0.042, 0.06, 0.41, 0, 1.1, 1, 1, 10, 7); // helmet
-  b.box('e:red', 0, 0.01, 0.012, 0.05, 0.1, 0.41, 0);
+  b.box('e:orange', 0, 0.01, 0.012, 0.05, 0.1, 0.41, 0);
   strut(b, 'paint', P.cGunLt, [0.02, 0.36, 0.06], [0.14, 0.27, 0.06], 0.03);
   strut(b, 'paint', P.cGunLt, [0.02, 0.36, -0.06], [0.14, 0.27, -0.06], 0.03);
   strut(b, 'paint', 0x2a2627, [-0.02, 0.27, 0.05], [0.04, 0.17, 0.08], 0.03);
@@ -272,9 +273,9 @@ function cHarvester(team: THREE.Color): Template {
     [-0.6, 0.18, 0.3], [0.12, 0.18, 0.32], [-0.6, 0.44, 0.24], [0.1, 0.46, 0.26], [-0.56, 0.54, 0.12], [0.06, 0.56, 0.14],
   ]));
   // glowing ore slits on the tank top
-  for (const x of [-0.46, -0.3, -0.14]) b.box('crystal', 0, 0.07, 0.012, 0.18, x, 0.56 - (x + 0.46) * -0.02, 0);
+  for (const x of [-0.46, -0.3, -0.14]) b.box('e:teal:soft', 0, 0.07, 0.012, 0.18, x, 0.56 - (x + 0.46) * -0.02, 0);
   for (const s of [1, -1]) {
-    b.box('paint', team, 0.5, 0.012, 0.05, -0.25, 0.505, s * 0.2, s * 0.6);
+    b.box('paint', team, 0.55, 0.012, 0.1, -0.25, 0.505, s * 0.19, s * 0.6);
     b.box('paint', P.cRed, 0.66, 0.014, 0.014, -0.24, 0.44, s * 0.255);
     fender(b, s, -0.62, 0.3, 0.22, 0.38, 0.1, 0.2, P.cGun);
     b.box('e:teal', 0, 0.36, 0.014, 0.006, -0.24, 0.3, s * 0.3);
@@ -282,8 +283,8 @@ function cHarvester(team: THREE.Color): Template {
   }
   // cab (angular, red visor windows)
   b.hull('paint', P.cGunLt, mz([[0.14, 0.2, 0.2], [0.42, 0.2, 0.16], [0.14, 0.44, 0.14], [0.34, 0.4, 0.1], [0.46, 0.28, 0.1]]));
-  b.box('e:red', 0, 0.012, 0.03, 0.16, 0.41, 0.36, 0, 0, 0, -0.9);
-  b.box('paint', team, 0.1, 0.01, 0.1, 0.24, 0.44, 0);
+  b.box('e:orange', 0, 0.012, 0.03, 0.16, 0.41, 0.36, 0, 0, 0, -0.9);
+  b.box('paint', team, 0.14, 0.01, 0.16, 0.24, 0.44, 0);
   b.box('paint', P.cRed, 0.03, 0.03, 0.03, 0.2, 0.46, 0.08);
   // scoop claws
   for (const s of [1, -1]) {
@@ -319,41 +320,47 @@ function cMcv(team: THREE.Color): Template {
   const b = new B({ aoHeight: 0.3 });
   tracks(b, tr);
   b.boxB('paint', P.cBlack, 1.26, 0.16, 0.5, 0, 0.06, 0);
-  // deck
-  b.hull('paint', P.cGun, mz([[-0.68, 0.18, 0.3], [0.56, 0.18, 0.32], [0.72, 0.18, 0.16], [-0.66, 0.3, 0.3], [0.52, 0.3, 0.3], [0.66, 0.26, 0.14]]));
+  // arrow-shaped deck, narrowing to a prow
+  b.hull('paint', P.cGun, mz([[-0.68, 0.18, 0.3], [0.3, 0.18, 0.32], [0.78, 0.18, 0.06], [-0.66, 0.29, 0.28], [0.28, 0.29, 0.28], [0.7, 0.25, 0.04]]));
   for (const s of [1, -1]) {
     fender(b, s, -0.68, 0.72, 0.28, 0.46, 0.11, 0.24, P.cGun);
     b.box('paint', P.cRed, 0.9, 0.014, 0.014, 0, 0.21, s * 0.455);
-    b.box('paint', team, 0.5, 0.01, 0.08, -0.1, 0.242, s * 0.38);
     b.box('e:teal', 0, 0.5, 0.012, 0.006, 0.1, 0.16, s * 0.46);
+    spike(b, 'paint', P.cBlack, 0.5, 0.16, s * 0.42, 0.22, 0.035, 0, -1.25);
   }
-  // cab at front
-  b.hull('paint', P.cGunLt, mz([[0.36, 0.3, 0.2], [0.62, 0.3, 0.14], [0.38, 0.5, 0.14], [0.54, 0.44, 0.1], [0.68, 0.32, 0.08]]));
-  b.box('e:red', 0, 0.012, 0.035, 0.18, 0.6, 0.4, 0, 0, 0, -0.9);
-  // folded pyramid core
-  b.hull('paint', P.cGun, mz([[-0.58, 0.3, 0.27], [0.28, 0.3, 0.27], [-0.5, 0.62, 0.1], [0.18, 0.62, 0.1], [-0.16, 0.78, 0]]));
-  spike(b, 'paint', P.cBlack, -0.16, 0.74, 0, 0.36, 0.07);
+  // cab on the prow
+  b.hull('paint', P.cGunLt, mz([[0.34, 0.29, 0.18], [0.6, 0.27, 0.1], [0.36, 0.46, 0.12], [0.52, 0.41, 0.07], [0.72, 0.28, 0.03]]));
+  b.box('e:orange', 0, 0.012, 0.035, 0.14, 0.6, 0.37, 0, 0, 0, -0.9);
+  // folded ziggurat core with crystal apex
+  const cx = -0.2;
+  b.taper('paint', P.cGun, 0.84, 0.5, 0.66, 0.38, 0.16, cx, 0.29, 0);
+  b.taper('paint', P.cRed, 0.67, 0.39, 0.65, 0.37, 0.025, cx, 0.45, 0);
+  b.taper('paint', P.cGunLt, 0.62, 0.35, 0.3, 0.16, 0.24, cx, 0.475, 0);
+  b.taper('paint', P.cBlack, 0.3, 0.16, 0.12, 0.08, 0.1, cx, 0.715, 0);
+  riftCrystal(b, cx, 0.9, 0, 0.07, 1.6);
+  for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) spike(b, 'paint', P.cGun, cx + sx * 0.1, 0.8, sz * 0.05, 0.2, 0.03, sz * 0.35, -sx * 0.35);
+  // folded petal wings (team colour inner faces) rising from the deck edges
   for (const s of [1, -1]) {
-    spike(b, 'paint', P.cGunLt, -0.5, 0.5, s * 0.2, 0.22, 0.04, s * 0.5, 0.4);
-    spike(b, 'paint', P.cGunLt, 0.2, 0.5, s * 0.2, 0.2, 0.035, s * 0.5, -0.4);
-  }
-  for (const s of [1, -1]) {
-    b.hull('paint', team, [
-      [-0.46, 0.4, s * 0.235], [0.14, 0.4, s * 0.235], [-0.4, 0.55, s * 0.15], [0.08, 0.55, s * 0.15],
-      [-0.46, 0.4, s * 0.245], [0.14, 0.4, s * 0.245], [-0.4, 0.55, s * 0.16], [0.08, 0.55, s * 0.16],
+    b.hull('paint', P.cGun, [
+      [-0.62, 0.29, s * 0.28], [0.22, 0.29, s * 0.28], [-0.62, 0.29, s * 0.2], [0.22, 0.29, s * 0.2],
+      [-0.5, 0.62, s * 0.2], [0.12, 0.6, s * 0.2], [-0.2, 0.7, s * 0.16],
     ]);
+    b.hull('paint', team, [
+      [-0.5, 0.36, s * 0.285], [0.12, 0.36, s * 0.285], [-0.42, 0.56, s * 0.235], [0.04, 0.55, s * 0.235], [-0.2, 0.62, s * 0.215],
+      [-0.5, 0.36, s * 0.295], [0.12, 0.36, s * 0.295], [-0.42, 0.56, s * 0.245], [0.04, 0.55, s * 0.245], [-0.2, 0.62, s * 0.225],
+    ]);
+    spike(b, 'paint', P.cBlack, -0.55, 0.55, s * 0.22, 0.24, 0.04, s * 0.7, 0.6);
+    spike(b, 'paint', P.cBlack, 0.16, 0.55, s * 0.22, 0.2, 0.035, s * 0.7, -0.6);
+    b.box('e:orange', 0, 0.5, 0.012, 0.012, -0.2, 0.46, s * 0.3);
   }
-  b.box('e:orange', 0, 0.62, 0.014, 0.012, -0.15, 0.625, 0.1);
-  b.box('e:orange', 0, 0.62, 0.014, 0.012, -0.15, 0.625, -0.1);
-  b.sphere('e:teal', 0, 0.045, -0.16, 0.86, 0, 1, 1.4, 1, 8, 6);
-  // folded claw arm
-  strut(b, 'paint', P.cBlack, [-0.64, 0.34, -0.22], [-0.3, 0.68, -0.2], 0.05, 0.05, 0.01);
-  strut(b, 'paint', P.cGunLt, [-0.3, 0.68, -0.2], [0.3, 0.52, -0.2], 0.04, 0.04, 0.01);
-  spike(b, 'paint', P.cRed, 0.3, 0.52, -0.2, 0.1, 0.025, 0, -1.8);
-  spike(b, 'paint', P.cRed, 0.3, 0.52, -0.16, 0.08, 0.02, 0.3, -1.6);
-  spike(b, 'paint', P.cBlack, -0.62, 0.3, 0.22, 0.2, 0.03, 0.3, 0.5);
-  b.box('e:amber:blink', 0, 0.03, 0.03, 0.03, 0.46, 0.51, 0.1);
-  b.box('e:amber:blink', 0, 0.03, 0.03, 0.03, 0.46, 0.51, -0.1);
+  // folded claw arm over the back
+  strut(b, 'paint', P.cBlack, [-0.66, 0.32, 0], [-0.52, 0.8, 0], 0.06, 0.06, 0.012);
+  strut(b, 'paint', P.cGunLt, [-0.52, 0.8, 0], [-0.1, 1.02, 0], 0.045, 0.045, 0.01);
+  b.sphere('paint', P.cRed, 0.045, -0.52, 0.8, 0, 1, 1, 1, 8, 6);
+  spike(b, 'paint', P.cRed, -0.1, 1.02, 0.02, 0.12, 0.022, 0.2, -2.3);
+  spike(b, 'paint', P.cRed, -0.1, 1.02, -0.02, 0.12, 0.022, -0.2, -2.3);
+  b.box('e:amber:blink', 0, 0.03, 0.03, 0.03, 0.46, 0.46, 0.08);
+  b.box('e:amber:blink', 0, 0.03, 0.03, 0.03, 0.46, 0.46, -0.08);
   body.add(b.meshes());
   body.add(treadNode(tr));
   return finalizeTemplate(root, [], vehicleAnim({ bob: 0.004 }));

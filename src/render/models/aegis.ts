@@ -34,8 +34,8 @@ function guardian(team: THREE.Color): Template {
     b.box('paint', team, 0.5, 0.03, 0.006, -0.08, 0.135, s * 0.357); // team stripe on skirts
   }
   // team stripes on the rear deck fenders (seen from above)
-  b.box('paint', team, 0.3, 0.012, 0.06, -0.28, 0.301, 0.27);
-  b.box('paint', team, 0.3, 0.012, 0.06, -0.28, 0.301, -0.27);
+  b.box('paint', team, 0.42, 0.012, 0.1, -0.22, 0.301, 0.265);
+  b.box('paint', team, 0.42, 0.012, 0.1, -0.22, 0.301, -0.265);
   // panel seams on the deck
   seam(b, -0.2, -0.33, -0.2, 0.33, 0.295);
   seam(b, 0.08, -0.33, 0.08, -0.2, 0.295);
@@ -79,7 +79,7 @@ function guardian(team: THREE.Color): Template {
   t.box('paint', P.aOlive, 0.06, 0.05, 0.12, -0.28, 0.12, 0.07);
   t.box('paint', 0x57583f, 0.06, 0.04, 0.1, -0.28, 0.115, -0.07);
   // team colour panels: roof stripe + cheek plates
-  t.box('paint', team, 0.12, 0.014, 0.33, -0.1, 0.145, 0);
+  t.box('paint', team, 0.26, 0.014, 0.28, -0.07, 0.145, 0);
   for (const s of [1, -1]) {
     t.hull('paint', team, [
       [-0.15, 0.03, s * 0.19], [0.06, 0.03, s * 0.205], [-0.15, 0.1, s * 0.17], [0.05, 0.11, s * 0.18],
@@ -137,6 +137,7 @@ function scout(team: THREE.Color): Template {
   b.box('paint', team, 0.12, 0.012, 0.05, 0.22, 0.2, -0.2);
   b.box('paint', team, 0.12, 0.012, 0.05, -0.22, 0.2, 0.2);
   b.box('paint', team, 0.12, 0.012, 0.05, -0.22, 0.2, -0.2);
+  b.box('paint', team, 0.18, 0.012, 0.2, 0.08, 0.232, 0, 0, 0, -0.04); // hood plate
   // windscreen
   b.box('paint', 0x1a2a38, 0.02, 0.05, 0.24, 0.235, 0.21, 0, 0, 0, -0.9);
   b.box('paint', P.aSandDk, 0.03, 0.012, 0.26, 0.25, 0.23, 0, 0, 0, -0.9);
@@ -220,7 +221,7 @@ function tempest(team: THREE.Color): Template {
   const pitch = 0.42;
   const l = new B({ aoHeight: 0 });
   l.cbox('paint', P.aSand, 0.46, 0.17, 0.3, 0.015, 0.0, 0.0, 0);
-  l.box('paint', team, 0.2, 0.012, 0.26, -0.05, 0.091, 0);
+  l.box('paint', team, 0.32, 0.012, 0.27, -0.03, 0.091, 0);
   l.box('paint', P.aGold, 0.012, 0.012, 0.28, 0.1, 0.091, 0);
   l.box('paint', P.aSandDk, 0.02, 0.18, 0.31, 0.225, 0, 0);
   const tubes: [number, number][] = [];
@@ -283,7 +284,7 @@ function titan(team: THREE.Color): Template {
     [-0.28, 0.18, 0.2], [-0.28, 0.18, -0.2], [0.14, 0.18, 0.21], [0.14, 0.18, -0.21], [0.27, 0.15, 0.09], [0.27, 0.15, -0.09],
   ]);
   t.box('paint', P.aSandDk, 0.66, 0.04, 0.54, -0.02, 0, 0);
-  t.box('paint', team, 0.16, 0.014, 0.38, -0.12, 0.186, 0);
+  t.box('paint', team, 0.3, 0.014, 0.36, -0.08, 0.186, 0);
   t.box('paint', P.aSandDk, 0.1, 0.11, 0.36, -0.34, 0.09, 0); // bustle
   t.cyl('paint', P.aSandDk, 0.06, 0.066, 0.05, 10, -0.08, 0.205, 0.11);
   t.box('paint', P.aSteelDk, 0.07, 0.05, 0.06, 0.02, 0.205, -0.12);
@@ -342,7 +343,7 @@ function harvester(team: THREE.Color): Template {
   b.cboxB('paint', P.aSand, 0.28, 0.26, 0.26, 0.03, 0.3, 0.2, -0.2);
   b.box('paint', 0x1a2a38, 0.02, 0.09, 0.22, 0.44, 0.38, -0.2);
   b.box('paint', 0x1a2a38, 0.2, 0.08, 0.02, 0.3, 0.38, -0.07);
-  b.box('paint', P.aSandDk, 0.3, 0.02, 0.28, 0.3, 0.47, -0.2);
+  b.box('paint', team, 0.3, 0.02, 0.28, 0.3, 0.47, -0.2);
   b.box('e:amber:blink', 0, 0.035, 0.03, 0.035, 0.34, 0.5, -0.28);
   b.box('e:amber:blink', 0, 0.035, 0.03, 0.035, 0.24, 0.5, -0.12);
   // engine block beside cab
@@ -365,7 +366,7 @@ function harvester(team: THREE.Color): Template {
   for (let i = 0; i < 16; i++) {
     const x = -0.2 + (rnd() - 0.5) * 0.56, z = (rnd() - 0.5) * 0.52;
     const h = 0.06 + rnd() * 0.07;
-    b.cone('crystal', 0, 0.022 + rnd() * 0.018, h, 5, x, 0.59 - Math.abs(z) * 0.2 + h * 0.3, z, (rnd() - 0.5) * 0.9, 0, (rnd() - 0.5) * 0.9);
+    b.cone(i % 4 ? 'crystal' : 'crystalCore', 0, 0.022 + rnd() * 0.018, h, 5, x, 0.59 - Math.abs(z) * 0.2 + h * 0.3, z, (rnd() - 0.5) * 0.9, 0, (rnd() - 0.5) * 0.9);
   }
 
   body.add(b.meshes());

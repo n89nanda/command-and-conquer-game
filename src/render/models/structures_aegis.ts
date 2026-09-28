@@ -183,10 +183,10 @@ const aPower: F = (team) => {
   g.torus('e:blue:pulse', 0, 0.5, 0.03, rx, Y + 0.42, rz, Math.PI / 2, 0, 0, 6, 24);
   for (let i = 0; i < 10; i++) {
     const a = ((i + 0.5) / 10) * Math.PI * 2;
-    g.box('e:blue:pulse', 0, 0.03, 0.1, 0.06, rx + Math.cos(a) * 0.485, Y + 0.3, rz + Math.sin(a) * 0.485, 0, -a, 0);
+    g.box('e:blue:softPulse', 0, 0.03, 0.1, 0.06, rx + Math.cos(a) * 0.485, Y + 0.3, rz + Math.sin(a) * 0.485, 0, -a, 0);
   }
   g.sphere('e:blue:pulse', 0, 0.1, rx, Y + 0.85, rz, 1, 0.6, 1, 10, 6);
-  for (const [tx, tz] of [[0.6, -0.55], [0.62, 0.2]] as const) g.cyl('e:blue:pulse', 0, 0.15, 0.15, 0.02, 12, tx, Y + 0.7, tz);
+  for (const [tx, tz] of [[0.6, -0.55], [0.62, 0.2]] as const) g.cyl('e:blue:softPulse', 0, 0.15, 0.15, 0.02, 12, tx, Y + 0.7, tz);
   root.add(node('glow', g));
 
   // fan on the transformer
@@ -230,7 +230,7 @@ const aRefinery: F = (team) => {
   b.box('paint', P.aGold, 1.82, 0.02, 1.42, -0.45, Y + 0.6, -0.6);
   windowsZ(b, -1.25, 0.05, Y + 0.45, 0.1, 6, 0.12, 0.09);
   // riftite processing window (glowing ore on conveyor)
-  b.box('crystal', 0, 0.9, 0.08, 0.02, -0.55, Y + 0.2, 0.105);
+  b.box('e:teal:soft', 0, 0.9, 0.08, 0.02, -0.55, Y + 0.2, 0.105);
   b.box('paint', P.aSteelDk, 0.96, 0.02, 0.03, -0.55, Y + 0.25, 0.11);
   b.box('paint', P.aSteelDk, 0.96, 0.02, 0.03, -0.55, Y + 0.15, 0.11);
   ventTop(b, -0.1, Y + 0.66, -1.0, 0.4, 0.4, 7, P.aSandDk);
@@ -246,7 +246,7 @@ const aRefinery: F = (team) => {
     b.dome('paint', P.aSteelLt, 0.29, sx, Y + 0.8, sz, 0.45, 16, 4);
     b.cyl('paint', team, 0.295, 0.295, 0.08, 16, sx, Y + 0.62, sz);
     b.cyl('paint', P.aGold, 0.295, 0.295, 0.015, 16, sx, Y + 0.12, sz);
-    b.box('crystal', 0, 0.02, 0.4, 0.05, sx + 0.29, Y + 0.38, sz);
+    b.box('e:teal:soft', 0, 0.02, 0.4, 0.05, sx + 0.29, Y + 0.38, sz);
     b.box('paint', P.aSteelDk, 0.03, 0.8, 0.07, sx - 0.2, Y + 0.4, sz + 0.2, 0, 0.8, 0);
   }
   pipe(b, 'metal', P.steel, [0.45, Y + 0.5, -1.0], [0.72, Y + 0.5, -1.0], 0.04);

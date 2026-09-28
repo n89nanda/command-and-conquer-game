@@ -11,8 +11,8 @@
  */
 import * as THREE from 'three';
 import type { ModelInstance, ModelLibrary } from './ModelTypes';
-import { B, P, Template, finalizeTemplate, instantiate, hashStr } from './kit';
-export { setOpacity } from './kit';
+import { B, P, Template, finalizeTemplate, instantiate, hashStr, markTeam } from './kit';
+export { setOpacity, ghost } from './kit';
 import { INFANTRY } from './infantry';
 import { AEGIS_UNITS } from './aegis';
 import { COVENANT_UNITS } from './covenant';
@@ -60,6 +60,7 @@ function getTemplate(kind: 'u' | 'b', id: string, team: THREE.Color): Template {
   let t = templates.get(key);
   if (t) return t;
   const f = kind === 'u' ? UNIT_FACTORIES[id] : BUILDING_FACTORIES[id];
+  markTeam(team);
   try {
     t = f ? f(team) : kind === 'u' ? fallbackUnit(team) : fallbackBuilding(team);
   } catch (err) {

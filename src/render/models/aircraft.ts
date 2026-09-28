@@ -62,6 +62,7 @@ function hawk(team: THREE.Color): Template {
     ]);
     b.box('paint', team, 0.06, 0.012, 0.03, -0.54, 0.325, s * 0.12);
   }
+  b.box('paint', team, 0.3, 0.012, 0.08, -0.1, 0.221, 0);
   b.box('paint', P.aGold, 0.2, 0.01, 0.02, 0.3, 0.13, 0.055);
   b.box('paint', P.aGold, 0.2, 0.01, 0.02, 0.3, 0.13, -0.055);
   // engine exhaust + nav lights
@@ -107,7 +108,7 @@ function wraith(team: THREE.Color): Template {
     [-0.14, 0.05, 0.1], [-0.14, 0.22, 0.08], [-0.26, 0.12, 0.04],
   ]));
   // cockpit visor
-  b.hull('e:red', 0, mz([[0.44, 0.13, 0.0], [0.34, 0.16, 0.05], [0.24, 0.2, 0.06], [0.3, 0.22, 0.0], [0.36, 0.12, 0.04]]));
+  b.hull('e:orange', 0, mz([[0.44, 0.13, 0.0], [0.34, 0.16, 0.05], [0.24, 0.2, 0.06], [0.3, 0.22, 0.0], [0.36, 0.12, 0.04]]));
   // tail boom
   b.hull('paint', P.cGunLt, mz([[-0.14, 0.1, 0.05], [-0.14, 0.2, 0.05], [-0.62, 0.14, 0.02], [-0.62, 0.18, 0.02]]));
   // tail fin + stabilisers
@@ -132,8 +133,8 @@ function wraith(team: THREE.Color): Template {
   b.cyl('paint', P.cBlack, 0.03, 0.045, 0.08, 8, 0.0, 0.27, 0);
   b.box('paint', P.cRed, 0.12, 0.01, 0.02, 0.22, 0.2, 0.055, 0, 0, -0.35);
   b.box('paint', P.cRed, 0.12, 0.01, 0.02, 0.22, 0.2, -0.055, 0, 0, -0.35);
-  b.sphere('e:red:blink', 0, 0.012, -0.12, 0.09, 0.3, 1, 1, 1, 6, 4);
-  b.sphere('e:red:blink', 0, 0.012, -0.12, 0.09, -0.3, 1, 1, 1, 6, 4);
+  b.sphere('e:orange:blink', 0, 0.012, -0.12, 0.09, 0.3, 1, 1, 1, 6, 4);
+  b.sphere('e:orange:blink', 0, 0.012, -0.12, 0.09, -0.3, 1, 1, 1, 6, 4);
   // tail rotor (static at this scale)
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI * 2;

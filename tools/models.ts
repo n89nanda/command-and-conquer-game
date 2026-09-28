@@ -10,9 +10,13 @@
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { UNIT_LIST } from '../src/data/units';
 import { BUILDING_LIST } from '../src/data/buildings';
-import { models, doodadParts, husk, rubble, DOODAD_KINDS } from '../src/render/models';
+import { models, doodadParts, husk, rubble, ghost, DOODAD_KINDS } from '../src/render/models';
 import type { DoodadKind } from '../src/render/models';
 import type { ModelInstance, ModelAnimState } from '../src/render/models/ModelTypes';
 
@@ -378,6 +382,20 @@ scene.traverse((o) => {
 });
 document.getElementById('stats')!.textContent = `${items.length} items, ${meshes} meshes, ${Math.round(tris / 1000)}k tris`;
 
+// ---------------------------------------------------------------- bloom (matches the game: threshold 1.35)
+let composer: EffectComposer | null = null;
+if (q.get('bloom') !== '0') {
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.38, 0.38, 1.35));
+  composer.addPass(new OutputPass());
+}
+// ?ghost=1 shows buildings as placement holograms (odd items invalid)
+if (q.get('ghost') === '1') {
+  let i = 0;
+  for (const e of instances) if (e.kind === 'building') ghost(e.inst.root, i++ % 2 === 0);
+}
+
 // ---------------------------------------------------------------- animate
 const t0 = performance.now();
 let last = t0;
@@ -402,7 +420,8 @@ function frame() {
     } else e.inst.update?.(dt, s);
     if (e.inst.turret && e.kind !== 'unit') e.inst.turret.rotation.y = Math.sin(t * 0.4 + e.phase) * 0.8;
   }
-  renderer.render(scene, camera);
+  if (composer) composer.render();
+  else renderer.render(scene, camera);
   labels.render(scene, camera);
   requestAnimationFrame(frame);
 }

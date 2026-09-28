@@ -12,7 +12,9 @@ export function makeHusk(live: Template, seed: number): Template {
     const m = o as THREE.Mesh;
     if (!m.isMesh) return;
     const key = (m.userData.matKey as string) ?? '';
-    if (key.startsWith('e:') || key.startsWith('crystal') || o.parent?.name === 'treads') {
+    const sm = m.material as THREE.MeshStandardMaterial;
+    const glows = !!sm.emissive && sm.emissiveIntensity > 0.2 && sm.emissive.getHex() !== 0;
+    if (key.startsWith('e:') || key.startsWith('crystal') || glows || o.parent?.name === 'treads') {
       kill.push(o);
       return;
     }

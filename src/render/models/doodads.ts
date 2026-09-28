@@ -271,13 +271,13 @@ function crystalCluster(b: B, stage: number, r: Rnd, body: string, tip: string):
     const h = (i === 0 ? 0.5 : 0.18 + r() * 0.28) * scale;
     const rad = (i === 0 ? 0.06 : 0.03 + r() * 0.03) * (0.6 + scale * 0.4);
     const tilt = i === 0 ? 0.08 : 0.25 + r() * 0.45;
-    shard(b, Math.cos(a) * d, Math.sin(a) * d, h, rad, Math.sin(a) * tilt, -Math.cos(a) * tilt, r() * 3, body, tip);
+    shard(b, Math.cos(a) * d, Math.sin(a) * d, h, rad, Math.sin(a) * tilt, -Math.cos(a) * tilt, r() * 3, body, i % 2 === 0 ? tip : body);
   }
   // scattered satellite shards across the tile
   const sat = 2 + stage * 3;
   for (let i = 0; i < sat; i++) {
     const a = r() * Math.PI * 2, d = 0.22 + r() * 0.22;
     const h = (0.06 + r() * 0.1) * scale;
-    shard(b, Math.cos(a) * d, Math.sin(a) * d, h, 0.015 + r() * 0.012, (r() - 0.5) * 0.8, (r() - 0.5) * 0.8, r() * 3, body, tip);
+    shard(b, Math.cos(a) * d, Math.sin(a) * d, h, 0.015 + r() * 0.012, (r() - 0.5) * 0.8, (r() - 0.5) * 0.8, r() * 3, body, body);
   }
 }

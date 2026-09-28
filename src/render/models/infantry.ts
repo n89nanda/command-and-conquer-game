@@ -72,7 +72,7 @@ function weaponParts(b: B, s: SoldierSpec): V3 | null {
       b.box('paint', P.cBlack, 0.18, 0.034, 0.026, 0.11, 0.085, 0.045);
       b.box('paint', P.cRed, 0.08, 0.012, 0.028, 0.12, 0.105, 0.045);
       b.box('paint', P.cGun, 0.03, 0.05, 0.02, 0.09, 0.05, 0.045);
-      b.box('e:red', 0, 0.03, 0.01, 0.03, 0.15, 0.07, 0.045);
+      b.box('e:orange', 0, 0.03, 0.01, 0.03, 0.15, 0.07, 0.045);
       b.cylX('paint', 0x151515, 0.009, 0.007, 0.07, 5, 0.23, 0.088, 0.045);
       return [0.27, HIP + 0.088, 0.045];
     case 'flame':
@@ -143,7 +143,7 @@ function soldier(s: SoldierSpec, team: THREE.Color): Template {
       b.sphere('paint', s.helmetCol, 0.05, -0.004, headY + 0.004, 0, 1, 1.1, 1, 10, 7);
       b.cone('paint', s.helmetCol, 0.04, 0.05, 6, -0.022, headY + 0.045, 0, 0, 0, 0.5);
       b.box('paint', 0x0b0b0c, 0.02, 0.04, 0.06, 0.035, headY - 0.005, 0);
-      b.box(s.visor ?? 'e:red', 0, 0.008, 0.012, 0.045, 0.046, headY, 0);
+      b.box(s.visor ?? 'e:orange', 0, 0.008, 0.012, 0.045, 0.046, headY, 0);
       break;
     }
     case 'mask': {
@@ -151,13 +151,13 @@ function soldier(s: SoldierSpec, team: THREE.Color): Template {
       b.hull('paint', s.armorDk, [
         [0.03, -0.03, -0.028], [0.03, -0.03, 0.028], [0.066, -0.01, 0], [0.04, 0.02, -0.03], [0.04, 0.02, 0.03],
       ], 0, headY, 0);
-      b.box(s.visor ?? 'e:red', 0, 0.01, 0.012, 0.06, 0.047, headY + 0.008, 0);
+      b.box(s.visor ?? 'e:orange', 0, 0.01, 0.012, 0.06, 0.047, headY + 0.008, 0);
       spike(b, 'paint', s.trim, -0.01, headY + 0.03, 0, 0.05, 0.012, 0, 0.35);
       break;
     }
     case 'crest': {
       b.dome('paint', s.helmetCol, 0.052, 0, headY + 0.002, 0, 0.95, 12, 4);
-      b.box(s.visor ?? 'e:red', 0, 0.012, 0.012, 0.07, 0.046, headY - 0.002, 0);
+      b.box(s.visor ?? 'e:orange', 0, 0.012, 0.012, 0.07, 0.046, headY - 0.002, 0);
       b.box('paint', s.trim, 0.09, 0.02, 0.012, -0.005, headY + 0.052, 0);
       break;
     }

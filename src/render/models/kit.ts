@@ -26,9 +26,9 @@ export type V2 = [number, number];
 // ============================================================================
 export const P = {
   // Aegis Coalition — military-industrial
-  aSand: 0x8e855e,
-  aSandLt: 0xa89e76,
-  aSandDk: 0x57523d,
+  aSand: 0x6d6a55,
+  aSandLt: 0x86836b,
+  aSandDk: 0x4a4839,
   aOlive: 0x5b6043,
   aSteel: 0x6b737a,
   aSteelLt: 0x8a9298,
@@ -41,8 +41,8 @@ export const P = {
   cGun: 0x3a3d45,
   cGunLt: 0x585c66,
   cGunXl: 0x70747c,
-  cRed: 0x9a1616,
-  cRedDk: 0x5c0d0e,
+  cRed: 0xc0621c,
+  cRedDk: 0x6a3212,
   cBone: 0x8f877a,
   // Common
   rubber: 0x1b1b1c,
@@ -82,7 +82,7 @@ export const GLOW = {
 } as const;
 export type GlowName = keyof typeof GLOW;
 /** Per-colour gain so bright hues (teal, white) don't blow out to white under ACES. */
-const GLOW_GAIN: Partial<Record<GlowName, number>> = { teal: 0.6, white: 0.75, green: 0.7, amber: 0.9, red: 1.2, orange: 1.05, violet: 1.2, blue: 0.9 };
+const GLOW_GAIN: Partial<Record<GlowName, number>> = { teal: 0.95, white: 0.8, green: 0.85, amber: 1.0, red: 1.1, orange: 1.0, violet: 1.2, blue: 1.0 };
 
 type AnimKind = 'blink' | 'blinkB' | 'pulse' | 'pulseFast' | 'flicker';
 const matCache = new Map<string, THREE.MeshStandardMaterial>();
@@ -104,10 +104,10 @@ export function mat(key: string): THREE.MeshStandardMaterial {
   if (key.startsWith('e:')) {
     const [, name, mod] = key.split(':');
     const hex = name.startsWith('#') ? parseInt(name.slice(1), 16) : GLOW[name as GlowName] ?? 0xffffff;
-    const base = name === 'win' || name === 'winWarm' ? 1.0 : 1.8;
+    const base = name === 'win' || name === 'winWarm' ? 1.0 : 3.0;
     const gain = name.startsWith('#') ? 0.9 : GLOW_GAIN[name as GlowName] ?? 1;
     const lvl = base * gain;
-    const intensity = mod === 'dim' ? lvl * 0.1 : mod === 'hot' ? lvl * 1.7 : lvl;
+    const intensity = mod === 'dim' ? lvl * 0.06 : mod === 'hot' ? lvl * 1.4 : mod === 'soft' || mod === 'softPulse' ? lvl * 0.4 : lvl;
     const col = new THREE.Color(hex);
     m = makeStd({
       color: col.clone().multiplyScalar(mod === 'dim' ? 0.25 : 0.35),
@@ -116,9 +116,14 @@ export function mat(key: string): THREE.MeshStandardMaterial {
       roughness: 0.35,
       metalness: 0.0,
     });
-    if (mod === 'blink' || mod === 'blinkB' || mod === 'pulse' || mod === 'pulseFast' || mod === 'flicker') {
-      animated.push({ m, kind: mod, base: intensity });
+    if (mod === 'blink' || mod === 'blinkB' || mod === 'pulse' || mod === 'pulseFast' || mod === 'flicker' || mod === 'softPulse') {
+      animated.push({ m, kind: (mod === 'softPulse' ? 'pulse' : mod) as AnimKind, base: intensity });
     }
+  } else if (key.startsWith('t:')) {
+    // team-colour panels: colour lives in the vertex colours, plus a faint self-glow so the
+    // team colour stays readable in shadow / on busy terrain
+    const col = new THREE.Color(parseInt(key.slice(3), 16));
+    m = makeStd({ vertexColors: true, roughness: 0.5, metalness: 0.15, emissive: col, emissiveIntensity: 0.12 });
   } else {
     switch (key) {
       case 'metal':
@@ -137,16 +142,16 @@ export function mat(key: string): THREE.MeshStandardMaterial {
         m = makeStd({ vertexColors: true, roughness: 0.08, metalness: 0.4 });
         break;
       case 'crystal':
-        m = makeStd({ color: 0x07503c, emissive: 0x19b886, emissiveIntensity: 0.75, roughness: 0.22, metalness: 0.2, flatShading: true });
+        m = makeStd({ color: 0x06382c, emissive: 0x19b886, emissiveIntensity: 0.35, roughness: 0.2, metalness: 0.25, flatShading: true });
         break;
       case 'crystalCore':
-        m = makeStd({ color: 0x3fe0b0, emissive: 0x2fe6b0, emissiveIntensity: 1.5, roughness: 0.1, metalness: 0.1, flatShading: true });
+        m = makeStd({ color: 0x3fe0b0, emissive: 0x2fe6b0, emissiveIntensity: 2.7, roughness: 0.1, metalness: 0.1, flatShading: true });
         break;
       case 'crystalRich':
-        m = makeStd({ color: 0x3b2380, emissive: GLOW.violet, emissiveIntensity: 0.95, roughness: 0.1, metalness: 0.3, flatShading: true });
+        m = makeStd({ color: 0x21124a, emissive: GLOW.violet, emissiveIntensity: 0.4, roughness: 0.15, metalness: 0.3, flatShading: true });
         break;
       case 'crystalRichCore':
-        m = makeStd({ color: 0x9a7cff, emissive: 0x9a70ff, emissiveIntensity: 1.6, roughness: 0.1, metalness: 0.1, flatShading: true });
+        m = makeStd({ color: 0x9a7cff, emissive: 0x9a70ff, emissiveIntensity: 3.0, roughness: 0.1, metalness: 0.1, flatShading: true });
         break;
       case 'paint':
       default:
@@ -276,6 +281,11 @@ export interface BuilderOpts {
 }
 
 const _c = new THREE.Color();
+/** Colours registered as team colours; parts painted with them get the team material. */
+const teamColors = new WeakSet<THREE.Color>();
+export function markTeam(c: THREE.Color): void {
+  teamColors.add(c);
+}
 
 export class B {
   private groups = new Map<string, THREE.BufferGeometry[]>();
@@ -298,6 +308,7 @@ export class B {
   }
 
   add(geo: THREE.BufferGeometry, m: string, col: Col, mtx?: THREE.Matrix4): this {
+    if (m === 'paint' && typeof col !== 'number' && teamColors.has(col)) m = 't:#' + col.getHexString();
     let g = geo.index ? geo.toNonIndexed() : geo;
     if (g === geo) g = geo.clone();
     geo.dispose();
@@ -757,4 +768,76 @@ export function setOpacity(root: THREE.Object3D, opacity: number): void {
     mesh.material = g;
     mesh.castShadow = step > 10 && ud.baseCast;
   });
+}
+
+// ============================================================================
+// Placement hologram
+// ============================================================================
+const ghostMats = new Map<string, THREE.Material>();
+function ghostMat(valid: boolean): THREE.Material {
+  const key = valid ? 'ok' : 'bad';
+  let m = ghostMats.get(key);
+  if (m) return m;
+  const tint = new THREE.Color(valid ? 0x46ffb4 : 0xff4030);
+  const sm = new THREE.MeshStandardMaterial({
+    color: 0x000000,
+    vertexColors: false,
+    emissive: tint,
+    emissiveIntensity: 0.35,
+    roughness: 1,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  sm.onBeforeCompile = (sh) => {
+    sh.uniforms.uGhostTint = { value: tint };
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uGhostTint;')
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        float gFr = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 2.0);
+        float gScan = 0.85 + 0.15 * step(0.5, fract(gl_FragCoord.y * 0.25));
+        totalEmissiveRadiance = uGhostTint * (0.25 + 1.6 * gFr) * gScan;`,
+      );
+  };
+  sm.customProgramCacheKey = () => 'riftfall-ghost';
+  ghostMats.set(key, sm);
+  m = sm;
+  return m;
+}
+
+/**
+ * Turn a model instance into a placement hologram (fresnel rim, additive, no depth write),
+ * tinted green (valid) or red (invalid). Cheap to call every frame; shared materials are untouched.
+ * Pass valid = null to restore the real materials.
+ */
+export function ghost(root: THREE.Object3D, valid: boolean | null): void {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const ud = mesh.userData;
+    if (!ud.baseMat) ud.baseMat = mesh.material;
+    if (ud.baseCast === undefined) ud.baseCast = mesh.castShadow;
+    if (valid === null) {
+      mesh.material = ud.baseMat as THREE.Material;
+      mesh.castShadow = ud.baseCast;
+      mesh.renderOrder = 0;
+      return;
+    }
+    mesh.material = ghostMat(valid);
+    mesh.castShadow = false;
+    mesh.renderOrder = 7;
+  });
+}
+
+/** Faceted Riftite crystal: dark glassy body with HDR-bright cores poking out of both tips. */
+export function riftCrystal(b: B, x: number, y: number, z: number, r: number, sy: number, rich = false): void {
+  const body = rich ? 'crystalRich' : 'crystal';
+  const core = rich ? 'crystalRichCore' : 'crystalCore';
+  b.add(new THREE.OctahedronGeometry(r, 0), body, 0, T(x, y, z, 0, 0, 0, 0.8, sy, 0.8));
+  for (const s of [1, -1]) b.add(new THREE.OctahedronGeometry(r * 0.32, 0), core, 0, T(x, y + s * r * sy * 0.82, z, 0, 0.4, 0, 0.8, sy, 0.8));
+  b.add(new THREE.OctahedronGeometry(r * 0.3, 0), core, 0, T(x, y, z, 0, 0.8, 0, 3.0, 0.5, 3.0));
 }

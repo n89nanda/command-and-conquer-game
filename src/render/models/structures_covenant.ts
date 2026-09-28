@@ -1,6 +1,6 @@
 /** Rift Covenant structures: black/gunmetal, spiky, red trim, red-orange + teal Riftite glow. */
 import * as THREE from 'three';
-import { B, P, V3, Template, finalizeTemplate, node, strut, spike, byName, damp, T, windowsZ, hazardStripX } from './kit';
+import { B, P, V3, Template, finalizeTemplate, node, strut, spike, byName, damp, T, windowsZ, hazardStripX, riftCrystal } from './kit';
 import { slabCov, beacon, dish, bAnim, chevron } from './structures_common';
 
 type F = (team: THREE.Color) => Template;
@@ -33,7 +33,7 @@ function redFrame(b: B, x: number, z: number, w: number, d: number, y: number, b
   redStripZ(b, z - d / 2 + bw, z + d / 2 - bw, y, x + w / 2 - bw / 2, bw, Math.round(d * 8));
 }
 /** Spiked pylon with glowing tip. */
-function pylon(b: B, x: number, z: number, h: number, tip = 'e:red:blink', y = Y): void {
+function pylon(b: B, x: number, z: number, h: number, tip = 'e:orange:blink', y = Y): void {
   b.taper('paint', P.cGun, 0.14, 0.14, 0.08, 0.08, h * 0.6, x, y, z);
   spike(b, 'paint', P.cBlack, x, y + h * 0.6, z, h * 0.4, 0.06);
   b.box('paint', P.cRed, 0.125, 0.02, 0.125, x, y + h * 0.35, z);
@@ -89,20 +89,20 @@ const cYard: F = (team) => {
   // glowing seams + doorway
   b.taper('e:orange:pulse', 0, 1.42, 1.42, 1.405, 1.405, 0.02, cx, Y + 0.395, cz);
   b.box('paint', P.dark, 0.44, 0.28, 0.04, cx, Y + 0.14, cz + 0.84);
-  b.box('e:red', 0, 0.36, 0.03, 0.02, cx, Y + 0.3, cz + 0.87);
+  b.box('e:orange', 0, 0.36, 0.03, 0.02, cx, Y + 0.3, cz + 0.87);
   b.hull('paint', P.cBlack, [[cx - 0.3, Y, cz + 0.86], [cx + 0.3, Y, cz + 0.86], [cx - 0.26, Y + 0.34, cz + 0.84], [cx + 0.26, Y + 0.34, cz + 0.84], [cx, Y + 0.48, cz + 0.8], [cx - 0.3, Y, cz + 0.9], [cx + 0.3, Y, cz + 0.9]]);
-  windowsZ(b, cx - 0.4, cx + 0.4, Y + 0.56, cz + 0.62, 4, 0.1, 0.05, 'e:red');
+  windowsZ(b, cx - 0.4, cx + 0.4, Y + 0.56, cz + 0.62, 4, 0.1, 0.05, 'e:orange');
   // front assembly pad
   b.boxB('paint', 0x232428, 1.1, 0.015, 0.8, 0.8, Y, 0.95);
   redFrame(b, 0.8, 0.95, 1.1, 0.8, Y + 0.015, 0.05);
   chevron(b, 0.8, Y + 0.03, 0.95, 0.4, P.cRed, 1);
   // pylons
   pylon(b, 1.3, -1.3, 0.8);
-  pylon(b, -1.3, 1.3, 0.8, 'e:red:blink');
+  pylon(b, -1.3, 1.3, 0.8, 'e:orange:blink');
   pylon(b, 1.3, 0.35, 0.6);
   root.add(b.meshes());
   const g = new B({ aoHeight: 0 });
-  g.add(new THREE.OctahedronGeometry(0.1, 0), 'crystal', 0, T(cx, Y + 1.75, cz, 0, 0, 0, 0.8, 1.6, 0.8));
+  riftCrystal(g, cx, Y + 1.75, cz, 0.1, 1.6);
   root.add(node('glow', g));
   const a = new B({ aoHeight: 0 });
   clawArm(a, 0.95, team);
@@ -150,7 +150,7 @@ const cPower: F = (team) => {
   b.box('paint', team, 0.3, 0.05, 0.26, 0.62, Y + 0.22, 0.62);
   for (let i = 0; i < 3; i++) spike(b, 'paint', P.cBlack, 0.52 + i * 0.1, Y + 0.28, 0.62, 0.14, 0.025);
   pylon(b, -0.8, 0.78, 0.55);
-  pylon(b, 0.78, -0.78, 0.55, 'e:red:blink');
+  pylon(b, 0.78, -0.78, 0.55, 'e:orange:blink');
   root.add(b.meshes());
   const g = new B({ aoHeight: 0 });
   // conduits in the plinth
@@ -158,10 +158,10 @@ const cPower: F = (team) => {
     const a = (i / 3) * Math.PI * 2 + 0.3 + Math.PI / 3;
     g.box('e:teal:pulse', 0, 0.5, 0.02, 0.04, cx + Math.cos(a) * 0.45, Y + 0.145, cz + Math.sin(a) * 0.45, 0, -a, 0);
   }
-  g.add(new THREE.CylinderGeometry(0.3, 0.3, 0.02, 8), 'e:teal:pulse', 0, T(cx, Y + 0.25, cz, 0, Math.PI / 8, 0));
+  g.add(new THREE.CylinderGeometry(0.3, 0.3, 0.02, 8), 'e:teal:softPulse', 0, T(cx, Y + 0.25, cz, 0, Math.PI / 8, 0));
   root.add(node('glow', g));
   const c = new B({ aoHeight: 0 });
-  c.add(new THREE.OctahedronGeometry(0.2, 0), 'crystal', 0, T(0, 0, 0, 0, 0, 0, 0.8, 1.5, 0.8));
+  riftCrystal(c, 0, 0, 0, 0.2, 1.5);
   c.torus('paint', P.cRed, 0.28, 0.012, 0, 0, 0, Math.PI / 2 + 0.3, 0, 0, 4, 20);
   root.add(node('core', c, cx, Y + 0.72, cz));
   return finalizeTemplate(root, [], bAnim({
@@ -184,7 +184,7 @@ const cRefinery: F = (team) => {
   for (const x of [px - 0.84, px + 0.84]) {
     b.taper('paint', P.cGun, 0.14, 0.18, 0.08, 0.1, 0.62, x, Y, 0.3);
     spike(b, 'paint', P.cBlack, x, Y + 0.62, 0.3, 0.2, 0.05);
-    b.sphere('e:red:blink', 0, 0.025, x, Y + 0.5, 0.36, 1, 1, 1, 6, 4);
+    b.sphere('e:orange:blink', 0, 0.025, x, Y + 0.5, 0.36, 1, 1, 1, 6, 4);
   }
   b.hull('paint', P.cGunLt, mz([[px - 0.84, Y + 0.5, 0.08], [px + 0.84, Y + 0.5, 0.08], [px, Y + 0.64, 0.08], [px - 0.84, Y + 0.56, 0.0], [px + 0.84, Y + 0.56, 0.0]]).map(([x, y, z]) => [x, y, z + 0.3] as V3));
   b.box('paint', team, 1.2, 0.05, 0.012, px, Y + 0.56, 0.39);
@@ -196,10 +196,10 @@ const cRefinery: F = (team) => {
   b.hull('paint', P.cGunLt, [[-1.2, Y + 0.64, -1.2], [0.3, Y + 0.64, -1.2], [-1.2, Y + 0.6, -0.1], [0.3, Y + 0.6, -0.1], [-1.0, Y + 0.95, -0.8], [0.1, Y + 0.95, -0.8], [-1.0, Y + 0.92, -0.5], [0.1, Y + 0.92, -0.5]]);
   b.box('paint', team, 1.0, 0.012, 0.28, -0.45, Y + 0.95, -0.65);
   for (let i = 0; i < 4; i++) spike(b, 'paint', P.cBlack, -1.1 + i * 0.4, Y + 0.64, -1.26, 0.35, 0.05, -0.4, 0);
-  b.box('crystal', 0, 1.2, 0.07, 0.02, -0.45, Y + 0.25, 0.155);
+  b.box('e:teal:soft', 0, 1.2, 0.07, 0.02, -0.45, Y + 0.25, 0.155);
   b.box('paint', P.cRed, 1.3, 0.02, 0.03, -0.45, Y + 0.31, 0.16);
   b.box('paint', P.cRed, 1.3, 0.02, 0.03, -0.45, Y + 0.19, 0.16);
-  windowsZ(b, -1.2, 0.3, Y + 0.45, 0.13, 5, 0.12, 0.05, 'e:red');
+  windowsZ(b, -1.2, 0.3, Y + 0.45, 0.13, 5, 0.12, 0.05, 'e:orange');
   // crystal vats
   for (const vz of [-1.0, -0.35]) {
     const vx = 1.0;
@@ -214,7 +214,7 @@ const cRefinery: F = (team) => {
   for (const vz of [-1.0, -0.35]) {
     c.cone('crystal', 0, 0.12, 0.5, 6, 1.0, Y + 0.4, vz);
     c.cone('crystalCore', 0, 0.06, 0.4, 5, 1.0, Y + 0.42, vz, 0, 0.5, 0);
-    c.cone('crystal', 0, 0.07, 0.3, 5, 1.08, Y + 0.3, vz + 0.05, 0.3, 0, -0.3);
+    c.cone('crystalCore', 0, 0.05, 0.25, 5, 1.08, Y + 0.3, vz + 0.05, 0.3, 0, -0.3);
   }
   root.add(c.meshes());
   return finalizeTemplate(root, [], bAnim({}));
@@ -232,7 +232,7 @@ const cBarracks: F = (team) => {
   // entrance on +Z
   b.hull('paint', P.cGunLt, [[-0.28, Y, 0.45], [0.28, Y, 0.45], [-0.22, Y + 0.36, 0.42], [0.22, Y + 0.36, 0.42], [0, Y + 0.5, 0.38], [-0.28, Y, 0.3], [0.28, Y, 0.3], [0, Y + 0.5, 0.3]]);
   b.box('paint', P.dark, 0.26, 0.28, 0.02, 0, Y + 0.14, 0.455);
-  b.box('e:red', 0, 0.2, 0.02, 0.02, 0, Y + 0.3, 0.46);
+  b.box('e:orange', 0, 0.2, 0.02, 0.02, 0, Y + 0.3, 0.46);
   b.boxB('paint', P.cBlack, 0.5, 0.03, 0.2, 0, Y, 0.56);
   // braziers
   for (const s of [1, -1]) {
@@ -250,7 +250,7 @@ const cBarracks: F = (team) => {
   h.cyl('paint', P.cRed, 0.155, 0.155, 0.015, 8, hx, hy + 0.36, hzz);
   const palmY = hy + 0.5;
   h.cbox('paint', P.cGun, 0.3, 0.26, 0.1, 0.03, hx, palmY, hzz, -0.25, 0, 0);
-  h.box('e:red:pulse', 0, 0.09, 0.09, 0.02, hx, palmY, hzz + 0.055, -0.25, 0, 0);
+  h.box('e:orange:pulse', 0, 0.09, 0.09, 0.02, hx, palmY, hzz + 0.055, -0.25, 0, 0);
   for (let i = 0; i < 4; i++) {
     const fx = hx - 0.105 + i * 0.07;
     const len = i === 1 || i === 2 ? 0.17 : 0.14;
@@ -292,17 +292,17 @@ const cFactory: F = (team) => {
     b.box('paint', team, 0.4, 0.2, 0.012, s * 1.0, Y + 0.35, fz + 0.24, -0.1, 0, 0);
     b.box('e:orange:pulse', 0, 0.3, 0.03, 0.02, s * 1.0, Y + 0.62, fz + 0.21, -0.1, 0, 0);
     spike(b, 'paint', P.cBlack, s * 0.72, Y + H + 0.08, fz + 0.1, 0.45, 0.07, 0, s * -0.25);
-    b.sphere('e:red:blink', 0, 0.025, s * 0.7, Y + H - 0.05, fz + 0.2, 1, 1, 1, 6, 4);
+    b.sphere('e:orange:blink', 0, 0.025, s * 0.7, Y + H - 0.05, fz + 0.2, 1, 1, 1, 6, 4);
   }
   b.hull('paint', P.cBlack, [[-0.68, Y + H - 0.16, fz], [0.68, Y + H - 0.16, fz], [-0.68, Y + H - 0.16, fz + 0.2], [0.68, Y + H - 0.16, fz + 0.2], [-0.68, Y + H + 0.1, fz], [0.68, Y + H + 0.1, fz], [0, Y + H + 0.1, fz + 0.18]]);
   b.box('paint', P.cRed, 1.3, 0.02, 0.02, 0, Y + H - 0.15, fz + 0.21);
   // dark interior with forge glow
   b.box('paint', 0x0b0b0c, 1.34, 0.74, 0.02, 0, Y + 0.37, fz + 0.005);
-  b.box('e:orange:pulse', 0, 1.1, 0.06, 0.02, 0, Y + 0.1, fz + 0.02);
+  b.box('e:orange:softPulse', 0, 1.1, 0.06, 0.02, 0, Y + 0.1, fz + 0.02);
   // roof: forge vents, chimneys, fins
   for (const x of [-0.7, 0, 0.7]) {
     b.box('paint', P.cBlack, 0.4, 0.05, 0.22, x, Y + H + 0.15, 0.25, 0.5, 0, 0);
-    b.box('e:orange:pulse', 0, 0.3, 0.02, 0.14, x, Y + H + 0.175, 0.25, 0.5, 0, 0);
+    b.box('e:orange:softPulse', 0, 0.3, 0.02, 0.14, x, Y + H + 0.175, 0.25, 0.5, 0, 0);
   }
   for (const x of [-0.9, 0.9]) {
     b.taper('paint', P.cBlack, 0.16, 0.16, 0.1, 0.1, 0.5, x, Y + H + 0.05, -0.9);
@@ -323,7 +323,7 @@ const cFactory: F = (team) => {
   redStripZ(b, fz + 0.22, 1.42, Y + 0.015, -0.68, 0.05, 6);
   redStripZ(b, fz + 0.22, 1.42, Y + 0.015, 0.68, 0.05, 6);
   pylon(b, -1.25, 1.25, 0.6);
-  pylon(b, 1.25, 1.25, 0.6, 'e:red:blink');
+  pylon(b, 1.25, 1.25, 0.6, 'e:orange:blink');
   root.add(b.meshes());
   // blast door
   const d = new B({ aoHeight: 0 });
@@ -354,7 +354,7 @@ const cRadar: F = (team) => {
   b.add(new THREE.CylinderGeometry(0.585, 0.59, 0.05, 6), 'paint', team, T(cx, Y + 0.25, cz));
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
-    b.box('e:red', 0, 0.12, 0.03, 0.02, cx + Math.cos(a) * 0.54, Y + 0.18, cz + Math.sin(a) * 0.54, 0, -a + Math.PI / 2, 0.0);
+    b.box('e:orange', 0, 0.12, 0.03, 0.02, cx + Math.cos(a) * 0.54, Y + 0.18, cz + Math.sin(a) * 0.54, 0, -a + Math.PI / 2, 0.0);
   }
   b.taper('paint', P.cGunLt, 0.34, 0.34, 0.1, 0.1, 1.0, cx, Y + 0.32, cz);
   for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
@@ -365,7 +365,7 @@ const cRadar: F = (team) => {
   b.cyl('paint', P.cBlack, 0.1, 0.12, 0.2, 6, 0.6, Y + 0.1, 0.62);
   dish(b, 'paint', P.cGun, 0.22, 0.06, 0.6, Y + 0.22, 0.62, 12);
   pylon(b, -0.8, 0.75, 0.5);
-  pylon(b, 0.75, -0.8, 0.5, 'e:red:blink');
+  pylon(b, 0.75, -0.8, 0.5, 'e:orange:blink');
   root.add(b.meshes());
   const r = new B({ aoHeight: 0 });
   r.torus('paint', P.cGun, 0.36, 0.022, 0, 0, 0, Math.PI / 2, 0, 0, 5, 20);
@@ -378,11 +378,11 @@ const cRadar: F = (team) => {
       [Math.cos(a) * 0.44, 0.02, Math.sin(a) * 0.44], [Math.cos(a + 0.12) * 0.37, 0, Math.sin(a + 0.12) * 0.37], [Math.cos(a - 0.12) * 0.37, 0, Math.sin(a - 0.12) * 0.37],
     ]);
   }
-  r.sphere('e:red:pulse', 0, 0.05, 0.42, 0.02, 0, 1, 1, 1, 8, 6);
+  r.sphere('e:orange:pulse', 0, 0.05, 0.42, 0.02, 0, 1, 1, 1, 8, 6);
   r.cyl('paint', P.cBlack, 0.09, 0.09, 0.06, 8, 0, 0, 0);
   root.add(node('dish', r, cx, Y + 0.95, cz));
   const e = new B({ aoHeight: 0 });
-  e.sphere('e:red:pulse', 0, 0.06, 0, 0, 0, 1, 1.3, 1, 8, 6);
+  e.sphere('e:orange:pulse', 0, 0.06, 0, 0, 0, 1, 1.3, 1, 8, 6);
   root.add(node('eye', e, cx, Y + 1.25, cz));
   return finalizeTemplate(root, [], bAnim({ spins: [{ name: 'dish', axis: 'y', rate: 1.1 }] }));
 };
@@ -401,7 +401,7 @@ const cRepair: F = (team) => {
   }
   // control spire
   b.taper('paint', P.cGun, 0.36, 0.36, 0.18, 0.18, 0.6, -1.18, Y - 0.01, -1.18);
-  b.box('e:red', 0, 0.2, 0.04, 0.02, -1.18, Y + 0.35, -1.05);
+  b.box('e:orange', 0, 0.2, 0.04, 0.02, -1.18, Y + 0.35, -1.05);
   spike(b, 'paint', P.cBlack, -1.18, Y + 0.58, -1.18, 0.3, 0.07);
   root.add(b.meshes());
   const g = new B({ aoHeight: 0 });
@@ -443,8 +443,8 @@ const cAirfield: F = (team) => {
   b.box('paint', team, 0.1, 0.01, 1.3, 1.3, Yr + 0.025, rz);
   for (let i = 0; i < 6; i++) {
     const x = -1.25 + i * 0.5;
-    b.box(i % 2 ? 'e:red' : 'e:red:blink', 0, 0.04, 0.03, 0.04, x, Yr + 0.035, rz + 0.72);
-    b.box(i % 2 ? 'e:red' : 'e:red:blink', 0, 0.04, 0.03, 0.04, x, Yr + 0.035, rz - 0.72);
+    b.box(i % 2 ? 'e:orange' : 'e:orange:blink', 0, 0.04, 0.03, 0.04, x, Yr + 0.035, rz + 0.72);
+    b.box(i % 2 ? 'e:orange' : 'e:orange:blink', 0, 0.04, 0.03, 0.04, x, Yr + 0.035, rz - 0.72);
   }
   // hangar bunker (back right)
   b.hull('paint', P.cGun, [[0.0, Y, -1.38], [1.38, Y, -1.38], [0.0, Y, -0.5], [1.38, Y, -0.5], [0.1, Y + 0.42, -1.3], [1.3, Y + 0.42, -1.3], [0.1, Y + 0.3, -0.62], [1.3, Y + 0.3, -0.62]]);
@@ -456,12 +456,12 @@ const cAirfield: F = (team) => {
   const tx = -0.95, tz = -0.95;
   b.taper('paint', P.cGun, 0.5, 0.5, 0.26, 0.26, 0.9, tx, Y, tz);
   b.taper('paint', P.cBlack, 0.34, 0.34, 0.4, 0.4, 0.14, tx, Y + 0.9, tz);
-  b.taper('e:red', 0, 0.4, 0.4, 0.38, 0.38, 0.05, tx, Y + 0.97, tz);
+  b.taper('e:orange', 0, 0.4, 0.4, 0.38, 0.38, 0.05, tx, Y + 0.97, tz);
   spike(b, 'paint', P.cGunLt, tx, Y + 1.04, tz, 0.4, 0.1);
   b.box('paint', team, 0.4, 0.06, 0.4, tx, Y + 0.4, tz);
   root.add(b.meshes());
   const r = new B({ aoHeight: 0 });
-  r.box('e:red', 0, 0.06, 0.03, 0.03, 0.05, 0, 0);
+  r.box('e:orange', 0, 0.06, 0.03, 0.03, 0.05, 0, 0);
   r.box('paint', P.cBlack, 0.03, 0.05, 0.05, 0, 0, 0);
   root.add(node('beacon', r, tx, Y + 1.3, tz));
   return finalizeTemplate(root, [], bAnim({ spins: [{ name: 'beacon', axis: 'y', rate: 4 }] }));
@@ -482,14 +482,14 @@ const cTemple: F = (team) => {
   // stairway down the +Z face
   for (let i = 0; i < 6; i++) b.boxB('paint', P.cBlack, 0.44, 0.12 + i * 0.12, 0.12, 0, Y, cz + 1.12 - i * 0.12);
   for (const s of [1, -1]) {
-    b.box('e:red', 0, 0.02, 0.02, 0.72, s * 0.235, Y + 0.38, cz + 0.8, 0.8, 0, 0);
+    b.box('e:orange', 0, 0.02, 0.02, 0.72, s * 0.235, Y + 0.38, cz + 0.8, 0.8, 0, 0);
     b.cyl('paint', P.cBlack, 0.05, 0.07, 0.22, 6, s * 0.4, Y + 0.11, 1.2);
     b.cone('e:orange:flicker', 0, 0.05, 0.1, 5, s * 0.4, Y + 0.27, 1.2);
   }
   // red glowing slits on the tiers
   for (const s of [1, -1]) {
-    windowsZ(b, -0.8, -0.3, Y + 0.18, cz + 1.12 * s, 2, 0.12, 0.05, 'e:red', s);
-    windowsZ(b, 0.3, 0.8, Y + 0.18, cz + 1.12 * s, 2, 0.12, 0.05, 'e:red', s);
+    windowsZ(b, -0.8, -0.3, Y + 0.18, cz + 1.12 * s, 2, 0.12, 0.05, 'e:orange', s);
+    windowsZ(b, 0.3, 0.8, Y + 0.18, cz + 1.12 * s, 2, 0.12, 0.05, 'e:orange', s);
   }
   // corner obelisks
   for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
@@ -503,7 +503,7 @@ const cTemple: F = (team) => {
   }
   root.add(b.meshes());
   const c = new B({ aoHeight: 0 });
-  c.add(new THREE.OctahedronGeometry(0.16, 0), 'crystal', 0, T(0, 0, 0, 0, 0, 0, 0.8, 1.6, 0.8));
+  riftCrystal(c, 0, 0, 0, 0.16, 1.6);
   c.torus('paint', P.cRed, 0.22, 0.012, 0, 0, 0, Math.PI / 2, 0, 0, 4, 20);
   root.add(node('core', c, 0, Y + 1.72, cz));
   return finalizeTemplate(root, [], bAnim({ spins: [{ name: 'core', axis: 'y', rate: 0.8 }], bobs: [{ name: 'core', amp: 0.04, freq: 1.3, power: true }] }));
@@ -529,7 +529,7 @@ const cSilo: F = (team) => {
   redStripX(b, -0.9, 1.2, Y + 0.24, 1.05, 0.08, 14);
   // control block (back left)
   b.hull('paint', P.cGunLt, [[-1.3, Y, -1.3], [-0.3, Y, -1.3], [-1.3, Y, -0.6], [-0.3, Y, -0.6], [-1.2, Y + 0.55, -1.2], [-0.4, Y + 0.55, -1.2], [-1.2, Y + 0.45, -0.7], [-0.4, Y + 0.45, -0.7]]);
-  windowsZ(b, -1.1, -0.5, Y + 0.3, -0.62, 3, 0.1, 0.05, 'e:red');
+  windowsZ(b, -1.1, -0.5, Y + 0.3, -0.62, 3, 0.1, 0.05, 'e:orange');
   spike(b, 'paint', P.cBlack, -0.8, Y + 0.52, -0.95, 0.55, 0.08);
   // missile tip braces
   for (let i = 0; i < 4; i++) {
@@ -547,7 +547,7 @@ const cSilo: F = (team) => {
   root.add(node('glow', g));
   const r = new B({ aoHeight: 0 });
   r.cyl('paint', P.cBlack, 0.04, 0.05, 0.05, 6, 0, 0.025, 0);
-  r.box('e:red', 0, 0.07, 0.04, 0.035, 0.035, 0.06, 0);
+  r.box('e:orange', 0, 0.07, 0.04, 0.035, 0.035, 0.06, 0);
   root.add(node('beacon', r, -0.4, Y + 0.55, -0.7));
   return finalizeTemplate(root, [], bAnim({ spins: [{ name: 'beacon', axis: 'y', rate: 3.5, power: false }] }));
 };
@@ -573,7 +573,7 @@ const cTurret: F = (team) => {
     const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
     spike(b, 'paint', P.cBlack, Math.cos(a) * 0.36, 0.07, Math.sin(a) * 0.36, 0.22, 0.04, Math.sin(a) * 0.5, -Math.cos(a) * 0.5);
   }
-  b.cyl('e:orange:pulse', 0, 0.2, 0.2, 0.02, 12, 0, 0.225, 0);
+  b.cyl('e:orange:softPulse', 0, 0.2, 0.2, 0.02, 12, 0, 0.225, 0);
   root.add(b.meshes());
   const t = new B({ aoBase: 0.23, aoHeight: 0.1, aoMin: 0.7 });
   t.cyl('paint', P.cBlack, 0.18, 0.2, 0.04, 10, 0, 0.02, 0);
@@ -582,7 +582,7 @@ const cTurret: F = (team) => {
   t.box('paint', P.cRed, 0.012, 0.012, 0.18, 0.07, 0.15, 0);
   spike(t, 'paint', P.cBlack, -0.16, 0.1, 0.12, 0.12, 0.025, 1.0, 0.8);
   spike(t, 'paint', P.cBlack, -0.16, 0.1, -0.12, 0.12, 0.025, -1.0, 0.8);
-  t.box('e:red', 0, 0.02, 0.015, 0.06, 0.18, 0.11, 0.06);
+  t.box('e:orange', 0, 0.02, 0.015, 0.06, 0.18, 0.11, 0.06);
   const turret = node('turret', t, 0, 0.23, 0);
   root.add(turret);
   const g = new B({ aoHeight: 0 });
@@ -667,11 +667,11 @@ const cObelisk: F = (team) => {
   const g = new B({ aoHeight: 0 });
   const face = new THREE.Vector3(0.2 - 0.02, 0.21 - (H + 0.08), 0).normalize();
   const ang = Math.atan2(face.x, -face.y);
-  g.box('e:red:pulse', 0, 0.02, H - 0.25, 0.05, 0.12, 0.21 + (H - 0.1) / 2, 0, 0, 0, ang);
-  for (let i = 0; i < 4; i++) g.box('e:red:pulse', 0, 0.022, 0.03, 0.2 - i * 0.02, 0.18 - i * 0.04, 0.4 + i * 0.28, 0, 0, 0, ang);
+  g.box('e:orange:pulse', 0, 0.02, H - 0.25, 0.05, 0.12, 0.21 + (H - 0.1) / 2, 0, 0, 0, ang);
+  for (let i = 0; i < 4; i++) g.box('e:orange:pulse', 0, 0.022, 0.03, 0.2 - i * 0.02, 0.18 - i * 0.04, 0.4 + i * 0.28, 0, 0, 0, ang);
   root.add(node('glow', g));
   const tip = new B({ aoHeight: 0 });
-  tip.add(new THREE.OctahedronGeometry(0.09, 0), 'e:red:pulse', 0, T(0, 0, 0, 0, 0, 0, 1.2, 1.6, 1.2));
+  tip.add(new THREE.OctahedronGeometry(0.09, 0), 'e:orange:pulse', 0, T(0, 0, 0, 0, 0, 0, 1.2, 1.6, 1.2));
   const tipY = H + 0.02;
   root.add(node('tip', tip, 0.06, tipY, 0));
   return finalizeTemplate(root, [new THREE.Vector3(0.1, tipY, 0)], bAnim({
@@ -706,7 +706,7 @@ const cWall: F = (team) => {
   b.box('paint', team, 0.16, 0.16, 0.012, 0, 0.2, -0.37, 0.35, 0, 0);
   root.add(b.meshes());
   const g = new B({ aoHeight: 0 });
-  g.taper('e:red:pulse', 0, 0.615, 0.615, 0.6, 0.6, 0.025, 0, 0.33, 0);
+  g.taper('e:orange:pulse', 0, 0.615, 0.615, 0.6, 0.6, 0.025, 0, 0.33, 0);
   root.add(g.meshes());
   return finalizeTemplate(root, []);
 };

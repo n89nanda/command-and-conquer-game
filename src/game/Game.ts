@@ -3,7 +3,7 @@ import { BUILDINGS, SUPERWEAPONS } from '../data/buildings';
 import { UNITS } from '../data/units';
 import { FACTIONS } from '../data/factions';
 import type { BuildTab, SoundId } from '../data/types';
-import { audio, doodadParts, husk, models, rubble } from '../bridge';
+import { audio, doodadParts, ghost, husk, models, rubble } from '../bridge';
 import { GameRenderer } from '../render/Renderer';
 import { registerWorldMaterial } from '../render/materials';
 import type { Building } from './Building';
@@ -103,6 +103,7 @@ export class Game {
   private ghost: THREE.Group | null = null;
   private ghostTiles: THREE.Mesh[] = [];
   private ghostDef: string | null = null;
+  private ghostOk: boolean | null = null;
   private markers: { x: number; z: number; t: number; color: string }[] = [];
   private lastAck = 0;
   private lastMoneySound = 0;
@@ -1066,21 +1067,21 @@ export class Game {
       this.ghost = new THREE.Group();
       const m = models.building(def.id, new THREE.Color(this.me.color));
       m.update?.(0.016, { time: 0, moving: false, speed: 0, firing: 0, health: 1, powered: true, producing: false, harvesting: false, build: 1 });
-      m.root.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (mesh.isMesh) {
-          mesh.renderOrder = 7;
+      if (ghost) ghost(m.root, true);
+      else
+        m.root.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh) return;
           const conv = (mat: THREE.Material) => {
             const c = mat.clone();
             c.transparent = true;
-            c.opacity = 0.7;
-            c.depthWrite = true;
+            c.opacity = 0.6;
+            c.depthWrite = false;
             return c;
           };
           mesh.material = Array.isArray(mesh.material) ? mesh.material.map(conv) : conv(mesh.material);
           mesh.castShadow = false;
-        }
-      });
+        });
       this.ghost.add(m.root);
       this.ghostTiles = [];
       const tileGeo = new THREE.PlaneGeometry(0.94, 0.94).rotateX(-Math.PI / 2);
@@ -1092,6 +1093,7 @@ export class Game {
       }
       scene.add(this.ghost);
       this.ghostDef = this.placing;
+      this.ghostOk = true;
     }
     const g = this.ghost!;
     g.visible = true;
@@ -1101,6 +1103,10 @@ export class Game {
     const root = g.children[0];
     root.position.set(tx + fw / 2, map.heightAt(tx + fw / 2, tz + fh / 2), tz + fh / 2);
     const ok = this.world.canPlace(this.me, def.id, tx, tz);
+    if (ghost && ok !== this.ghostOk) {
+      this.ghostOk = ok;
+      ghost(root, ok);
+    }
     let k = 0;
     for (let z = 0; z < fh; z++)
       for (let x = 0; x < fw; x++) {
