@@ -48,6 +48,7 @@ class IronTide extends CampaignScript {
     ], 3);
     this.objective('temple', 'Destroy the Temple of the Rift inside the Citadel of Ash.');
     this.objective('citadel', 'Raze the Citadel of Ash: destroy every Covenant structure.');
+    this.beacon('temple', temple, 'TEMPLE OF THE RIFT', '#ff6a4a');
     this.loseWhenWiped('Your command has been destroyed.');
     this.reveal(CITADEL.x, CITADEL.z, 8);
     this.dialogue([
@@ -63,6 +64,7 @@ class IronTide extends CampaignScript {
     this.after(360, () => this.betrayal());
     this.when(() => temple.dead, () => {
       this.complete('temple');
+      if (this.citadel().length > 0) this.beacon('citadel', CITADEL, 'CITADEL OF ASH', '#ff6a4a');
       this.dialogue([
         ['enemy', 'You burn an empty shrine, Hale. The Rift Missile was never here.'],
         ['enemy', 'It waits at the Wound. Where the Rift first touched the Earth. Come and watch it rise.'],
@@ -102,6 +104,7 @@ class IronTide extends CampaignScript {
       this.speakerNames = { ...this.speakerNames, intel: 'Lt. Reyes' };
       this.say('Lieutenant Reyes, taking over intelligence. Voss is gone, sir. She wiped her files on the way out.', 'intel');
       this.objective('brandt', 'Save Colonel Brandt: destroy the strike force in his base.', true);
+      if (this.isOpen('brandt')) this.beacon('brandt', BRANDT, 'COL. BRANDT', '#6aff8a');
       this.reveal(BRANDT.x, BRANDT.z, 10);
     });
     // Voss's kill code overloads Brandt's reactors, then the strike comes in cloaked

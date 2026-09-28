@@ -17,7 +17,7 @@ import type { World } from '../src/game/World';
 import type { Player } from '../src/game/Player';
 import { CAMPAIGNS } from '../src/game/mission/campaigns';
 import { CampaignScript, type Pt } from '../src/game/mission/common';
-import { MissionScript, type MissionDef, type MissionHost, type Speaker } from '../src/game/mission/MissionScript';
+import { MissionScript, type Beacon, type MissionDef, type MissionHost, type Speaker } from '../src/game/mission/MissionScript';
 
 const args = process.argv.slice(2);
 const flag = (n: string) => args.find((a) => a.startsWith('--' + n + '='))?.split('=')[1];
@@ -62,6 +62,7 @@ class StubHost implements MissionHost {
   missionTimer: { label: string; seconds: number } | null = null;
   alwaysRadar = false;
   cinematic = false;
+  beacons: Beacon[] = [];
   log: string[] = [];
   ended: boolean | null = null;
   endT = 0;
@@ -236,6 +237,9 @@ function simulate(def: MissionDef, mode: 'idle' | 'cheat' | 'auto', minutes: num
     const maxT = minutes * 60;
     let cheatT = 0;
     let objectivesSeen = 0;
+    let maxBeacons = 0;
+    const beaconIds = new Set<string>();
+    const stale = new Map<string, number>();
     const autoState = { cp: 0 };
     let autoT = 0;
     while (world.time < maxT && host.ended === null) {
@@ -256,11 +260,22 @@ function simulate(def: MissionDef, mode: 'idle' | 'cheat' | 'auto', minutes: num
         }
       }
       objectivesSeen = Math.max(objectivesSeen, host.objectives.length);
+      if (world.tickCount % 15 === 0) {
+        const bs = host.beacons ?? [];
+        maxBeacons = Math.max(maxBeacons, bs.length);
+        for (const b of bs) {
+          beaconIds.add(b.id);
+          if (b.entity?.dead) stale.set(b.id, (stale.get(b.id) ?? 0) + 0.5);
+        }
+      }
       if (errors.length > 0) break;
     }
     const ms = performance.now() - t0;
     const objs = host.objectives.map((o) => `${o.done ? '+' : o.failed ? 'x' : '-'}${o.id}`).join(' ');
     const end = host.ended === null ? 'running' : host.ended ? 'VICTORY' : 'DEFEAT';
+    const staleIds = [...stale].filter(([, t]) => t > 5).map(([id]) => id);
+    notes.push(`${mode}: beacons max ${maxBeacons} seen [${[...beaconIds].join(' ')}]${staleIds.length ? ' STALE ' + staleIds.join(',') : ''}`);
+    if (staleIds.length) notes.push('WARN beacon left on a dead entity: ' + staleIds.join(','));
     notes.push(`${mode}: ${end} @ ${(host.ended === null ? world.time : host.endT).toFixed(0)}s  objectives[${objs}] lines ${host.lines} hints ${host.hints} msgs ${host.log.length} (${(ms / 1000).toFixed(1)}s)`);
     if (errors.length) notes.push('FAIL errors: ' + errors.slice(0, 3).join(' | ')), (ok = false);
     if (badIds.length) notes.push('FAIL unknown ids: ' + [...new Set(badIds)].join(',')), (ok = false);

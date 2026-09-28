@@ -52,6 +52,8 @@ class Crucible extends CampaignScript {
     this.holdSuperweapon(camp, 'ionStrike');
     this.objective('temple', 'The Temple of the First Shard must not fall.');
     this.objective('siege', 'Break the Coalition siege: destroy their camp in the south-east.');
+    this.beacon('temple', temple, 'TEMPLE', '#6aff8a');
+    this.beacon('siege', CAMP, 'SIEGE CAMP', '#ff6a4a');
     this.loseWhenWiped('The faithful of the First Shard are no more.');
     this.reveal(CAMP.x, CAMP.z, 6);
     this.dialogue([
@@ -135,6 +137,7 @@ class Crucible extends CampaignScript {
     });
     this.after(20, () => {
       this.objective('uplink', 'Destroy the Ion Uplink in the siege camp before it fires again.');
+      if (!this.r.uplink.dead) this.beacon('uplink', this.r.uplink, 'ION UPLINK', '#ff4a3a');
       this.reveal(this.r.uplink.x, this.r.uplink.z, 5);
       this.countdown('ION CANNON', ION_RECHARGE, () => this.templeStrike());
       let stalled = false;

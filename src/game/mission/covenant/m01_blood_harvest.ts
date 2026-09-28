@@ -44,6 +44,7 @@ class BloodHarvest extends CampaignScript {
     this.loseWhenWiped('The raid has failed. The faithful are scattered.');
     this.objective('harvesters', `Burn the defilers' harvesters (${3 - this.harvLeft()}/3).`);
     for (const f of FIELDS) this.reveal(f.x, f.z, 4);
+    harvesters.forEach((h, i) => this.beacon('harvesters:' + i, h, 'HARVESTER', '#ff6a4a'));
     this.dialogue([
       ['commander', 'Harbinger. The Coalition calls this place a quarantine zone. We call it the Vale of Saint Ilya, and it is holy.'],
       ['commander', 'Their machines tear the sacred crystal from the earth and burn it in their engines. It ends today.'],
@@ -63,6 +64,7 @@ class BloodHarvest extends CampaignScript {
 
     this.on('unitDied', (e) => {
       if (!harvesters.includes(e.unit)) return;
+      this.clearBeacon('harvesters:' + harvesters.indexOf(e.unit));
       const n = 3 - this.harvLeft();
       const o = this.host.objectives.find((x) => x.id === 'harvesters');
       if (o) {
@@ -83,6 +85,9 @@ class BloodHarvest extends CampaignScript {
     this.after(50, () => {
       this.say('Harbinger, Coalition wardens are rounding up the villagers of Saint Ilya for "decontamination". Free them.', 'intel');
       this.objective('ilya', 'Liberate the village of Saint Ilya.', true);
+      this.when(() => !this.isOpen('ilya') || (this.host.beacons?.length ?? 0) < 3, () => {
+        if (this.isOpen('ilya')) this.beacon('ilya', VILLAGE, 'SAINT ILYA', '#9fd8ff');
+      });
       this.reveal(VILLAGE.x, VILLAGE.z, 5);
     });
     this.when(() => !this.liberated && this.alive(this.r.wardens).length === 0 && this.anyNear(me, VILLAGE.x, VILLAGE.z, 7), () => {
@@ -130,6 +135,7 @@ class BloodHarvest extends CampaignScript {
     ]);
     this.after(10, () => {
       this.objective('outpost', 'Destroy the Coalition reclamation outpost.');
+      if (this.isOpen('outpost')) this.beacon('outpost', OUTPOST, 'RECLAMATION OUTPOST', '#ff6a4a');
       this.reveal(OUTPOST.x, OUTPOST.z, 9);
       this.reinforce(me, ['zealot', 'zealot', 'zealot', 'raider', 'raider'], 3, 44, CAMP.x + 10, CAMP.z - 14);
       this.hint('<b>Flame Zealots</b> set structures and infantry ablaze. Press <kbd>A</kbd> and click to <b>attack-move</b>: everything in the group advances and fights along the way.', 16);

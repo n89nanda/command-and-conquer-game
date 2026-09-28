@@ -449,6 +449,12 @@ export abstract class CampaignScript extends MissionScript {
   countdownLeft(): number {
     return this.cd && !this.cd.fired ? Math.max(0, this.cd.end - this.t) : 0;
   }
+  /** Objective exists and is neither complete nor failed. */
+  isOpen(id: string) {
+    const o = this.host.objectives.find((x) => x.id === id);
+    return !!o && !o.done && !o.failed;
+  }
+
   /** Push the running countdown back (e.g. a charge stalls on low power). */
   delayCountdown(sec: number) {
     if (this.cd && !this.cd.fired) this.cd.end += sec;

@@ -78,7 +78,7 @@ const PARAMS: Record<Difficulty, AITuning> = {
     harvPerRef: 1, maxRefineries: 2, maxDefenses: 2, micro: false, retreatHp: 0, squadRetreat: 0,
     counter: 0.15, incomeBonus: 0, cheatBase: false, mistakes: 0.3, buildDelay: [2, 6], armyQueue: 1, prodPause: 6,
     maxAircraft: 1, harass: false, earlyHarass: false, engineers: 1, expand: false, sellDying: false,
-    techTime: 1e9, swTime: 1e9, repairBelow: 0.4, reinforce: false, focusFire: false, armyCap: 25,
+    techTime: 1e9, swTime: 1e9, repairBelow: 0.4, reinforce: false, focusFire: false, armyCap: 30,
   },
   normal: {
     think: 0.6, firstAttack: 330, minAttackGap: 90, waveMin: 6, waveGrowth: 2, waveMax: 18,
@@ -1100,6 +1100,14 @@ export class SkirmishAI {
         if (!q.items.some((i) => UNITS[i.defId]?.harvester)) p.enqueue(harvDef.id, this.world);
       }
     }
+    // ---- no construction yard: queued structures can't progress, get the money back
+    if (!this.myBuildings.some((b) => b.def.produces === 'yard')) {
+      for (const tab of ['structures', 'defense'] as BuildTab[]) {
+        const q = p.queues[tab];
+        for (let i = q.items.length - 1; i >= 0; i--) p.dequeue(q.items[i].defId, this.world);
+        if (q.items.length && q.items[0].onHold) p.dequeue(q.items[0].defId, this.world);
+      }
+    }
     // ---- rebuild the construction yard
     const mcv = this.kit.mcv;
     if (mcv && !this.myBuildings.some((b) => b.def.produces === 'yard') && !this.my.some((u) => u.def.mcv)) {
@@ -1171,7 +1179,7 @@ export class SkirmishAI {
     if (!this.myBuildings.some((b) => b.def.produces === 'yard')) return null;
     const counts = this.roleCounts();
     if (!(counts.factory ?? 0) && !(counts.barracks ?? 0)) return null;
-    if (this.now < (this.difficulty === 'brutal' ? 150 : this.difficulty === 'hard' ? 200 : this.difficulty === 'normal' ? 300 : 480)) return null;
+    if (this.now < (this.difficulty === 'brutal' ? 150 : this.difficulty === 'hard' ? 200 : this.difficulty === 'normal' ? 300 : 360)) return null;
     // economy first
     if ((counts.refinery ?? 0) < Math.min(2, this.P.maxRefineries) && this.player.credits < 2500) return null;
     const n = this.defenseCount();

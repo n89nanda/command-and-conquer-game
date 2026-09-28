@@ -50,6 +50,7 @@ class RiftAscendant extends CampaignScript {
     this.holdSuperweapon(aegis, 'ionStrike');
     this.objective('silo', 'Build a Rift Missile Silo.');
     this.objective('hq', 'Destroy Bastion Prime, the Coalition command center.');
+    this.beacon('hq', hq, 'BASTION PRIME', '#ff6a4a');
     this.loseWhenWiped('The Covenant\'s last army has fallen.');
     this.when(() => !me.has('c_yard') && !this.units(me).some((u) => !!u.def.mcv) && this.myStructures().length === 0, () => this.defeat('The MCV was destroyed.'));
     this.reveal(HQ.x, HQ.z, 8);
@@ -70,6 +71,7 @@ class RiftAscendant extends CampaignScript {
         this.reveal(HQ.x, HQ.z, 18);
         this.reveal(UPLINK.x, UPLINK.z, 5);
         this.objective('uplink', 'Destroy the Coalition Ion Uplink.', true);
+        if (this.isOpen('uplink')) this.beacon('uplink', uplink, 'ION UPLINK', '#ff4a3a');
       });
     });
     this.after(210, () => this.say('Voss. I trusted you with my soldiers\' lives. You will hang for every one of them.', 'enemy'));

@@ -50,6 +50,7 @@ class Starfall extends CampaignScript {
     ], 4);
     this.objective('silo', 'Destroy the Rift Missile Silo before launch.');
     this.objective('temple', 'Destroy Temple Prime and end the Prophet\'s reign.');
+    this.beacon('silo', silo, 'RIFT MISSILE SILO', '#ff6a4a');
     this.loseWhenWiped('The Coalition has lost its last army.');
     this.when(() => !me.has('a_yard') && !this.units(me).some((u) => !!u.def.mcv) && this.myStructures().length === 0, () => this.defeat('The MCV was destroyed.'));
     this.reveal(ENEMY.x, ENEMY.z, 10);
@@ -76,6 +77,7 @@ class Starfall extends CampaignScript {
       this.after(19, () => {
         this.say('Voss has a forward base in the south-east. It is feeding armour into your flank.', 'intel');
         this.objective('fwd', 'Destroy Dr. Voss\'s forward base.', true);
+        if (!fwdFactory.dead) this.beacon('fwd', FWD, 'VOSS FORWARD BASE', '#c890ff');
         this.reveal(FWD.x, FWD.z, 8);
       });
     });
@@ -131,6 +133,7 @@ class Starfall extends CampaignScript {
     if (this.siloDown) return;
     this.siloDown = true;
     this.complete('silo');
+    if (!this.r.temple.dead) this.beacon('temple', this.r.temple, 'TEMPLE PRIME', '#ff6a4a');
     this.stopCountdown();
     const { cov, voss } = this.r;
     this.dialogue([

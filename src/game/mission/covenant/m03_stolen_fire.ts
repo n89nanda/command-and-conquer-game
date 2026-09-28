@@ -45,6 +45,8 @@ class StolenFire extends CampaignScript {
     for (const p of this.r.patrols) this.patrol(p.units, p.route, 6);
     this.objective('capture', 'Capture the Coalition Tech Center with a Technician.');
     this.objective('keep', 'At least one Technician must survive until the Tech Center is taken.');
+    this.beacon('capture', techCenter, 'TECH CENTER');
+    this.beacon('reactors', REACTORS, 'REACTORS', '#ff6a4a');
     this.reveal(STATION.x, STATION.z, 6);
     this.reveal(REACTORS.x, REACTORS.z, 5);
     this.dialogue([
@@ -71,6 +73,7 @@ class StolenFire extends CampaignScript {
 
     // power
     this.when(() => aurora.lowPower, () => {
+      this.clearBeacon('reactors');
       this.dialogue([
         ['intel', 'Their reactors are failing! The Rail Spires are dark.'],
         ['commander', 'Now the towers on the south road. Clear a path for the Technicians.'],
@@ -100,7 +103,9 @@ class StolenFire extends CampaignScript {
     this.complete('capture');
     this.complete('keep');
     techCenter.hp = Math.max(techCenter.hp, techCenter.maxHp * 0.6);
+    this.clearBeacon('reactors');
     this.objective('upload', 'Hold the Tech Center until the upload completes.');
+    this.beacon('upload', techCenter, 'HOLD', '#6aff8a');
     this.countdown('DATA UPLOAD', UPLOAD_TIME, () => this.uploaded());
     this.dialogue([
       ['intel', 'We are inside! The Ion Uplink schematics are flowing to the Oracle.'],

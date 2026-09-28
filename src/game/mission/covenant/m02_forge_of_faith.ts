@@ -68,6 +68,7 @@ class ForgeOfFaith extends CampaignScript {
         ['intel', 'Scorpions are quick. Infernos will burn Sentinel\'s walls. Bring both.'],
       ]);
       this.objective('sentinel', 'Destroy Firebase Sentinel.');
+      if (this.isOpen('sentinel')) this.beacon('sentinel', ENEMY, 'FIREBASE SENTINEL', '#ff6a4a');
       this.reveal(ENEMY.x, ENEMY.z, 8);
     });
     this.when(() => me.has('c_radar'), () => this.hint('<b>Oracle Array</b> online: you have <b>radar</b>. The <b>Inferno</b> tank is now available at the Forge.', 12));
@@ -76,8 +77,13 @@ class ForgeOfFaith extends CampaignScript {
     this.after(150, () => {
       this.objective('oil', 'Capture both oil derricks with Technicians.', true);
       for (const d of DERRICKS) this.reveal(d.x + 1, d.z + 1, 3);
+      if (this.isOpen('oil')) this.r.derricks.forEach((d, i) => d.owner !== me && this.beacon('oil:' + i, d, 'OIL DERRICK', '#9fd8ff'));
       this.say('Two derricks lie in the basin. A Technician can bring them into the fold.', 'intel');
       this.hint('Train a <b>Technician</b>, select it and <b>right-click</b> an Oil Derrick to capture it for steady income.', 12);
+    });
+    this.on('captured', (e) => {
+      const i = this.r.derricks.indexOf(e.building);
+      if (i >= 0 && e.to === me) this.clearBeacon('oil:' + i);
     });
     this.when(() => this.r.derricks.every((d) => d.owner === me), () => {
       this.objective('oil', 'Capture both oil derricks with Technicians.', true);
@@ -92,6 +98,7 @@ class ForgeOfFaith extends CampaignScript {
         ['commander', 'They are unarmed, Hale, and you know it. Harbinger, save them.'],
       ]);
       this.objective('well', 'Protect the pilgrims at the Well of Ashur.', true);
+      this.beacon('well', WELL, 'WELL OF ASHUR', '#6aff8a');
       this.reveal(WELL.x, WELL.z, 7);
       this.raid = this.wave(rangers, ['guardian', 'guardian', 'rifleman', 'rifleman', 'rifleman', 'rifleman', 'scout'], { x: 66, z: 30 }, WELL);
       this.hunt(rangers, [pilgrims, me], 5);
