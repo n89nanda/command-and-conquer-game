@@ -75,6 +75,8 @@ export class Pathfinder {
   private closed: Uint32Array;
   private curGen = 1;
   private heap: Heap;
+  /** nodes expanded by the last search (for budgeting) */
+  lastExpanded = 0;
 
   constructor(map: GameMap) {
     this.map = map;
@@ -93,6 +95,7 @@ export class Pathfinder {
    * `extraBlocked` lets callers treat some tiles as passable (e.g. own destination building).
    */
   find(sx: number, sz: number, tx: number, tz: number, maxNodes = 12000, ignoreBuildingId = 0): { x: number; z: number }[] {
+    this.lastExpanded = 0;
     const map = this.map;
     const W = map.w;
     sx = Math.floor(sx);
@@ -179,6 +182,7 @@ export class Pathfinder {
         }
       }
     }
+    this.lastExpanded = expanded;
     const end = found ? goal : best;
     const tiles: number[] = [];
     for (let c = end; c !== -1 && c !== start; c = parent[c]) tiles.push(c);

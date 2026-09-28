@@ -205,44 +205,11 @@ export function generateMap(spec: MapSpec): GeneratedMap {
     }
   }
 
-  // ---- heights
-  const target = new Float32Array(w * h);
-  for (let z = 0; z < h; z++)
-    for (let x = 0; x < w; x++) {
-      const i = z * w + x;
-      const t = map.terrain[i];
-      let y = (fbm(x * 0.045, z * 0.045, 4, seed + 101) - 0.5) * 1.6;
-      const ds = distToStart(x, z);
-      if (ds < 12) y *= Math.max(0, (ds - 6) / 6); // flatten bases
-      if (t === Terrain.Rock) y = 1.4 + fbm(x * 0.3, z * 0.3, 3, seed + 7) * 1.6;
-      if (t === Terrain.Water) y = -0.9;
-      if (t === Terrain.Sand) y = Math.min(y, 0) - 0.12;
-      if (t === Terrain.Road) y *= 0.8;
-      target[i] = y;
-    }
-  for (let z = 0; z <= h; z++)
-    for (let x = 0; x <= w; x++) {
-      // average of adjacent tiles, with rock-dominance so mountains read as mountains
-      let sum = 0, n = 0, rockN = 0, rockSum = 0, waterN = 0;
-      for (let dz = -1; dz <= 0; dz++)
-        for (let dx = -1; dx <= 0; dx++) {
-          const tx = x + dx, tz = z + dz;
-          if (tx < 0 || tz < 0 || tx >= w || tz >= h) continue;
-          const i = tz * w + tx;
-          sum += target[i];
-          n++;
-          if (map.terrain[i] === Terrain.Rock) {
-            rockN++;
-            rockSum += target[i];
-          }
-          if (map.terrain[i] === Terrain.Water) waterN++;
-        }
-      let y = n ? sum / n : 0;
-      if (rockN === n && n > 0) y = rockSum / rockN;
-      else if (rockN > 0) y = y * 0.6 + (rockSum / rockN) * 0.15;
-      if (waterN > 0 && waterN < n) y = Math.min(y, -0.25);
-      map.heights[z * (w + 1) + x] = y;
-    }
+  // ---- heights (see bakeHeights below)
+  bakeHeights(map, seed, (x, z) => {
+    const ds = distToStart(x, z);
+    return ds < 12 ? Math.max(0, (ds - 6) / 6) : 1; // flatten bases
+  });
 
   // ---- ore fields
   const placeField = (fx: number, fz: number, r: number, rich: boolean, flip = false) => {
@@ -384,4 +351,106 @@ export function generateMap(spec: MapSpec): GeneratedMap {
     }
   }
   return { map, starts, derricks, civilians };
+}
+
+// ---- heights
+/**
+ * Bake vertex heights from terrain types. Passable ground stays smooth and walkable (never below
+ * -0.2, so nothing on land dips under the water plane at -0.32); impassable Rock rises in noisy
+ * terraces (~0.6 steps) that climb toward the interior of each rock mass so ridges read as cliffs;
+ * Water deepens with distance from the shore so the water shader gets a real depth gradient.
+ * `flatten(x, z)` scales the rolling-ground noise (0 = flat, 1 = full), e.g. around base sites.
+ * Shared by generateMap and the mission MapEditor.
+ */
+export function bakeHeights(map: GameMap, seed: number, flatten?: (x: number, z: number) => number) {
+  const { w, h } = map;
+  const T = map.terrain;
+  // chamfer distance (in tiles) from the nearest tile outside the set; the map outside counts as rock
+  const distInto = (isIn: (t: number) => boolean, outsideIn: boolean) => {
+    const d = new Float32Array(w * h);
+    const BIG = 1e4;
+    for (let i = 0; i < w * h; i++) d[i] = isIn(T[i]) ? BIG : 0;
+    const at = (x: number, z: number) => (x < 0 || z < 0 || x >= w || z >= h ? (outsideIn ? BIG : 0) : d[z * w + x]);
+    for (let z = 0; z < h; z++)
+      for (let x = 0; x < w; x++) {
+        const i = z * w + x;
+        if (!d[i]) continue;
+        d[i] = Math.min(d[i], at(x - 1, z) + 1, at(x, z - 1) + 1, at(x - 1, z - 1) + 1.414, at(x + 1, z - 1) + 1.414);
+      }
+    for (let z = h - 1; z >= 0; z--)
+      for (let x = w - 1; x >= 0; x--) {
+        const i = z * w + x;
+        if (!d[i]) continue;
+        d[i] = Math.min(d[i], at(x + 1, z) + 1, at(x, z + 1) + 1, at(x + 1, z + 1) + 1.414, at(x - 1, z + 1) + 1.414);
+      }
+    for (let i = 0; i < w * h; i++) if (d[i] >= 1e4) d[i] = 8; // fully enclosed (only when outsideIn)
+    return d;
+  };
+  const rockD = distInto((t) => t === Terrain.Rock, true);
+  const waterD = distInto((t) => t === Terrain.Water, false);
+  const ss = (a: number, b: number, v: number) => {
+    const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+  const STEP = 0.6;
+  const target = new Float32Array(w * h);
+  for (let z = 0; z < h; z++)
+    for (let x = 0; x < w; x++) {
+      const i = z * w + x;
+      const t = T[i];
+      let y = (fbm(x * 0.045, z * 0.045, 4, seed + 101) - 0.5) * 1.6;
+      if (flatten) y *= flatten(x + 0.5, z + 0.5);
+      if (t === Terrain.Rock) {
+        // rises toward the interior of the mass, then quantised into terraces with noisy risers
+        const d = Math.min(rockD[i], 5);
+        const r = 0.9 + d * 0.38 + fbm(x * 0.19, z * 0.19, 3, seed + 7) * 1.25;
+        const q = r / STEP + (valueNoise(x * 0.6, z * 0.6, seed + 13) - 0.5) * 0.35;
+        const fl = Math.floor(q);
+        y = (fl + ss(0.6, 1, q - fl)) * STEP + (valueNoise(x * 1.3, z * 1.3, seed + 17) - 0.5) * 0.12;
+      } else if (t === Terrain.Water) {
+        y = -0.5 - Math.min(waterD[i], 4) * 0.15;
+      } else {
+        if (t === Terrain.Sand) y = Math.min(y, 0) - 0.12;
+        else if (t === Terrain.Road) y *= 0.8;
+        else if (t === Terrain.Concrete) y *= 0.3;
+        y = Math.max(y, -0.2);
+      }
+      target[i] = y;
+    }
+  for (let z = 0; z <= h; z++)
+    for (let x = 0; x <= w; x++) {
+      // passable tiles own their corners: a vertex shared with rock follows the ground (plus a small
+      // lip) so the cliff rises entirely inside the rock tile and walkable ground stays flat
+      let n = 0, sum = 0, rockN = 0, rockSum = 0, waterN = 0, groundN = 0, groundSum = 0;
+      for (let dz = -1; dz <= 0; dz++)
+        for (let dx = -1; dx <= 0; dx++) {
+          const tx = x + dx, tz = z + dz;
+          if (tx < 0 || tz < 0 || tx >= w || tz >= h) continue;
+          const i = tz * w + tx;
+          const t = T[i];
+          n++;
+          sum += target[i];
+          if (t === Terrain.Rock) {
+            rockN++;
+            rockSum += target[i];
+          } else {
+            if (t === Terrain.Water) waterN++;
+            else {
+              groundN++;
+              groundSum += target[i];
+            }
+          }
+        }
+      let y = n ? sum / n : 0;
+      if (rockN === n && n > 0) y = rockSum / rockN;
+      else if (rockN > 0) {
+        const other = n - rockN;
+        y = groundN ? groundSum / groundN : (sum - rockSum) / other;
+        y += (rockN / n) * 0.18;
+      }
+      // shoreline corners sit just above the water plane so land never dips under it
+      if (waterN > 0 && groundN > 0) y = Math.min(groundSum / groundN, -0.24) + (rockN / n) * 0.18;
+      else if (waterN > 0 && rockN > 0) y = Math.min(y, -0.1);
+      map.heights[z * (w + 1) + x] = y;
+    }
 }

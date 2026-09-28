@@ -1005,8 +1005,9 @@ export class SkirmishAI {
         if (r) return r;
       }
     }
-    // floating money: more production first
-    if (credits > 3000 && this.now > 360) {
+    // floating money (queues already full and credits piling up): more production first
+    const queuesFull = (['infantry', 'vehicles'] as BuildTab[]).every((t) => this.player.queues[t].items.length >= this.P.armyQueue);
+    if (credits > 3500 && queuesFull && this.now > 360) {
       const fMax = this.difficulty === 'brutal' || this.difficulty === 'hard' ? 3 : 2;
       if (has('factory') < fMax) {
         const f = pick(kit.byRole.factory);
@@ -1036,11 +1037,11 @@ export class SkirmishAI {
       if (f) return f;
     }
     // extra production when floating money
-    if (credits > 3500 && has('factory') < (this.difficulty === 'brutal' || this.difficulty === 'hard' ? 3 : 2) && this.now > 420) {
+    if (credits > 3500 && queuesFull && has('factory') < (this.difficulty === 'brutal' || this.difficulty === 'hard' ? 3 : 2) && this.now > 420) {
       const f = pick(kit.byRole.factory);
       if (f) return f;
     }
-    if (credits > 4500 && has('barracks') < 2 && this.now > 480) {
+    if (credits > 4500 && queuesFull && has('barracks') < 2 && this.now > 480) {
       const f = pick(kit.byRole.barracks);
       if (f) return f;
     }
@@ -1251,7 +1252,7 @@ export class SkirmishAI {
     const n = this.defenseCount();
     const timeCap = Math.floor(1 + this.now / 150);
     const pressure = this.now - this.lastThreatT < 60 || this.now - this.lastSquadLost < 90 ? 2 : 0;
-    const rich = this.player.credits > 5000 || this.armyUnits().length >= this.P.armyCap - 2 ? 4 : 0;
+    const rich = this.player.credits > 6000 || this.armyUnits().length >= this.P.armyCap - 2 ? 4 : 0;
     const cap = Math.min(this.P.maxDefenses + (this.opts.passive ? 4 : 0) + pressure + rich, timeCap + pressure + rich);
     const mix = this.enemyMix();
     const airSeen = mix.aircraft > 0.05;
@@ -1350,7 +1351,8 @@ export class SkirmishAI {
     const army = this.armyUnits();
     // floating a lot of money: allow a bigger army rather than sit on it
     const cap = this.P.armyCap + (p.credits > 6000 ? 10 : 0) + (p.credits > 15000 ? 10 : 0);
-    if (army.length >= cap) return;
+    const airOnly = army.length >= cap && this.huntingAir(); // endgame: planes to catch the last aircraft
+    if (army.length >= cap && !airOnly) return;
     // economic reserve: keep money for the structure being built and a pending harvester
     let reserve = 0;
     const sq = p.queues.structures.items[0];
@@ -1373,6 +1375,7 @@ export class SkirmishAI {
     const hasFactory = this.myBuildings.some((b) => b.def.produces === 'factory' && b.operational);
     const infCap = 0.25 + this.enemyMix().infantry * 0.3;
     for (const tab of ['infantry', 'vehicles', 'aircraft'] as BuildTab[]) {
+      if (airOnly && tab !== 'aircraft') continue;
       const q = p.queues[tab];
       const extra = rich ? 1 : 0;
       if (tab === 'infantry' && hasFactory && infV / allV > infCap && credits < 2500 && army.length > 6) continue;
@@ -1411,6 +1414,33 @@ export class SkirmishAI {
     this.profCache = buildProfile(entries);
     this.profTime = this.now;
     return this.profCache;
+  }
+
+  /** Endgame: the enemy has no structures left we know of, only aircraft (which may hover over cliffs/water). */
+  private huntCache = { frame: -1, v: false };
+  private huntingAir(): boolean {
+    if (this.huntCache.frame === this.frame) return this.huntCache.v;
+    const v = this.computeHuntingAir();
+    this.huntCache = { frame: this.frame, v };
+    return v;
+  }
+  private computeHuntingAir(): boolean {
+    if (this.knownBuildings.some((b) => !b.owner.isNeutral && !b.def.wall)) return false;
+    let air = false;
+    if (this.P.cheatBase || this.now > 1500) {
+      for (const u of this.world.units) {
+        if (u.dead || !u.owner.isEnemyOf(this.player)) continue;
+        if (!u.def.flying) return false;
+        air = true;
+      }
+      return air;
+    }
+    for (const sv of this.seen.values()) {
+      if (sv.unit.dead || this.now - sv.t > 120) continue;
+      if (!sv.def.flying) return false;
+      air = true;
+    }
+    return air;
   }
 
   private aaCache = { t: -999, v: 0 };
@@ -1537,9 +1567,11 @@ export class SkirmishAI {
       if (ui.role === 'aircraft') {
         if (air >= this.P.maxAircraft) continue;
         if (this.opts.passive) continue;
-        const r = this.perf.get(d.id);
-        if (r && r.lost >= d.cost * 2 && this.tradeFactor(d.id) < 0.8) continue; // not paying off
-        if (this.enemyAAShare() > 0.25 && this.difficulty !== 'easy') continue; // they can shoot planes down
+        if (!this.huntingAir()) {
+          const r = this.perf.get(d.id);
+          if (r && r.lost >= d.cost * 2 && this.tradeFactor(d.id) < 0.8) continue; // not paying off
+          if (this.enemyAAShare() > 0.25 && this.difficulty !== 'easy') continue; // they can shoot planes down
+        } else if (ui.dps.aircraft > 0) s *= 3;
       }
       if (ui.role === 'infantry' && inf / total > 0.55) s *= 0.6;
       if (mix.aircraft > 0.05 && ui.antiAir) s *= 1.2;
@@ -1817,7 +1849,8 @@ export class SkirmishAI {
     let own = 0;
     for (const u of this.my) if (this.isCombat(u) || u.def.flying) own += u.def.cost;
     for (const t of ['infantry', 'vehicles', 'aircraft'] as BuildTab[]) for (const it of this.player.queues[t].items) if (!UNITS[it.defId].harvester) own += UNITS[it.defId].cost * 0.5;
-    const v = this.now > 150 && est > own * 1.15 + 500;
+    // (early game only: later on, economy is how we catch up)
+    const v = this.now > 150 && this.now < 660 && est > own * 1.15 + 500;
     this.behindCache = { t: this.now, v };
     return v;
   }
@@ -1870,7 +1903,7 @@ export class SkirmishAI {
     if (pool.length < want && pool.length < cap) return;
     if (pool.length === 0) return;
     // don't suicide into a much bigger army we have seen (normal+)
-    const ratio = this.difficulty === 'easy' ? 0 : this.difficulty === 'normal' ? 0.8 : this.difficulty === 'hard' ? 1.2 : 1.1;
+    const ratio = this.difficulty === 'easy' ? 0 : this.difficulty === 'normal' ? 1.0 : this.difficulty === 'hard' ? 1.2 : 1.1;
     const poolV = pool.reduce((a, u) => a + this.value(u), 0);
     const est = this.enemyArmyEstimate();
     const waited = this.now - Math.max(this.lastAttackT, this.firstAttackTime());
@@ -2498,6 +2531,29 @@ export class SkirmishAI {
     if (ready.length === 0) return;
     const homeThreat = this.now - this.lastThreatT < 4;
     if (this.opts.passive && !homeThreat) return;
+    if (this.huntingAir()) {
+      // endgame: the enemy's last units are aircraft, possibly hovering over cliffs or water
+      // where nothing on the ground can reach them. Go after the last known position.
+      let best: Unit | null = null;
+      let bd = Infinity;
+      const pool: Unit[] = this.P.cheatBase || this.now > 1500 ? this.world.units : [...this.seen.values()].filter((sv) => this.now - sv.t <= 120).map((sv) => sv.unit);
+      for (const e of pool) {
+        if (e.dead || !e.def.flying || !e.owner.isEnemyOf(this.player)) continue;
+        const d = Math.hypot(e.x - this.cx, e.z - this.cz);
+        if (d < bd) {
+          bd = d;
+          best = e;
+        }
+      }
+      if (best) {
+        for (const u of ready) {
+          if (!u.weapons.some((w) => w.def.targetsAir)) continue;
+          this.st(u).lastOrder = this.now;
+          u.issue({ type: 'attack', target: best }, this.world);
+        }
+        return;
+      }
+    }
     const need = homeThreat ? 1 : Math.min(total, this.difficulty === 'easy' ? 1 : total >= 4 ? 3 : 2);
     if (ready.length < need) return;
     const group = ready.slice(0, 4);
@@ -2529,6 +2585,7 @@ export class SkirmishAI {
       if (e.def.harvester) s += 6;
       if (unitInfo(e.def).role === 'artillery') s += 4;
       if (e.weapons.some((w) => w.def.targetsAir)) s -= 3; // shoots back
+      if (e.isAir) s += 5; // air superiority: enemy aircraft are worth chasing
       s -= aaNear(e.x, e.z) * aaWeight;
       s -= Math.hypot(e.x - a.x, e.z - a.z) * 0.05;
       if (s > bs) {

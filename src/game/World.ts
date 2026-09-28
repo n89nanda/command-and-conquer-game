@@ -130,12 +130,14 @@ export class World {
 
   private processPaths() {
     // time-budgeted so large group orders never cause a frame hitch
-    const deadline = performance.now() + 2.5;
+    // fixed per-tick search budget (deterministic, independent of machine speed)
+    let budget = 40000;
     let n = 0;
-    while (this.pathQueue.length && (n++ < 2 || performance.now() < deadline)) {
+    while (this.pathQueue.length && (n++ < 2 || budget > 0)) {
       const u = this.pathQueue.shift()!;
       if (u.dead || !u.needsPath) continue;
       const path = this.pathfinder.find(u.x, u.z, u.goalX, u.goalZ, 9000, u.pathIgnoreBuilding);
+      budget -= this.pathfinder.lastExpanded + 200;
       // keep exact goal point when final tile is the goal tile
       if (path.length) {
         const last = path[path.length - 1];
@@ -522,7 +524,7 @@ export class World {
     const tx = Math.floor(u.x - def.footprint[0] / 2 + 0.5);
     const tz = Math.floor(u.z - def.footprint[1] / 2 + 0.5);
     for (let z = tz; z < tz + def.footprint[1]; z++)
-      for (let x = tx; x < tx + def.footprint[0]; x++) if (!this.map.buildable(x, z)) return false;
+      for (let x = tx; x < tx + def.footprint[0]; x++) if (!this.map.buildable(x, z) || this.padAt(x, z) || this.isReserved(x, z)) return false;
     for (const o of this.units) {
       if (o === u || o.dead || o.isAir) continue;
       if (o.x > tx - 0.1 && o.x < tx + 3.1 && o.z > tz - 0.1 && o.z < tz + 3.1) {
@@ -594,9 +596,47 @@ export class World {
   }
 
   // ------------------------------------------------------------------ resources
+  // ---- connectivity regions (so harvesters never chase unreachable ore)
+  private regions: Int32Array | null = null;
+  private regionsVersion = -1;
+  regionAt(x: number, z: number): number {
+    const map = this.map;
+    if (!this.regions || this.regionsVersion !== map.passVersion) {
+      this.regionsVersion = map.passVersion;
+      const reg = (this.regions ??= new Int32Array(map.w * map.h));
+      reg.fill(0);
+      let next = 1;
+      const stack: number[] = [];
+      for (let i = 0; i < reg.length; i++) {
+        if (reg[i] || !map.passable(i % map.w, Math.floor(i / map.w))) continue;
+        reg[i] = next;
+        stack.push(i);
+        while (stack.length) {
+          const c = stack.pop()!;
+          const cx = c % map.w, cz = (c - cx) / map.w;
+          for (let dz = -1; dz <= 1; dz++)
+            for (let dx = -1; dx <= 1; dx++) {
+              const nx = cx + dx, nz = cz + dz;
+              if (!map.inBounds(nx, nz)) continue;
+              const j = nz * map.w + nx;
+              if (reg[j] || !map.passable(nx, nz)) continue;
+              if (dx && dz && (!map.passable(cx + dx, cz) || !map.passable(cx, cz + dz))) continue;
+              reg[j] = next;
+              stack.push(j);
+            }
+        }
+        next++;
+      }
+    }
+    if (!map.inBounds(x, z)) return 0;
+    return this.regions![z * map.w + x];
+  }
+
   /** Find the best ore tile near (x,z), preferring tiles no other harvester targets. */
   findOre(x: number, z: number, h: Unit): number {
     const map = this.map;
+    const myRegion = this.regionAt(Math.floor(h.x), Math.floor(h.z));
+    const now = this.time;
     const taken = new Set<number>();
     for (const u of this.units) if (u !== h && !u.dead && u.def.harvester && (u.harvState === 'toOre' || u.harvState === 'harvesting')) taken.add(u.harvTile);
     let best = -1;
@@ -609,6 +649,9 @@ export class World {
           const i = tz * map.w + tx;
           if (map.ore[i] < 20) continue;
           if (!map.passable(tx, tz)) continue;
+          if (myRegion && this.regions![i] !== myRegion) continue;
+          const bl = h.oreBlacklist.get(i);
+          if (bl !== undefined && bl > now) continue;
           let s = Math.hypot(tx - x, tz - z) + (taken.has(i) ? 6 : 0) - (map.oreType[i] === 2 ? 2 : 0);
           // distance from harvester matters too
           s += Math.hypot(tx + 0.5 - h.x, tz + 0.5 - h.z) * 0.3;

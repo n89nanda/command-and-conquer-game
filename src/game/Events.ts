@@ -25,7 +25,7 @@ export interface GameEvents {
   announce: { player: Player | null; text: string; priority?: number; x?: number; z?: number };
   message: { text: string; color?: string };
   harvest: { unit: Unit };
-  credits: { player: Player; amount: number; x: number; z: number };
+  credits: { player: Player; amount: number; x: number; z: number; source?: 'harvest' | 'derrick' | 'capture' };
   deployed: { unit: Unit; building: Building };
   ack: { unit: Unit; kind: 'select' | 'move' | 'attack' };
   unitAttacked: { unit: Unit; x: number; z: number };

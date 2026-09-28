@@ -11,7 +11,7 @@ const vs = (infantry: number, light: number, heavy: number, building: number, ai
 const list: WeaponDef[] = [
   // --- Infantry ---
   { id: 'rifle', damage: 11, range: 4.5, cooldown: 0.9, projectile: 'bullet', vs: vs(1, 0.45, 0.1, 0.2), targetsGround: true, targetsAir: false, sound: 'rifle' },
-  { id: 'rocketInf', damage: 45, range: 5.5, cooldown: 2.4, projectile: 'rocket', projectileSpeed: 12, splash: 0.5, vs: vs(0.25, 1, 1, 0.55, 1), targetsGround: true, targetsAir: true, sound: 'rocket' },
+  { id: 'rocketInf', damage: 45, range: 5.5, cooldown: 2.4, projectile: 'rocket', projectileSpeed: 12, splash: 0.5, vs: vs(0.25, 1, 1, 0.55, 0.65), targetsGround: true, targetsAir: true, sound: 'rocket' },
   { id: 'flameInf', damage: 16, range: 2.6, cooldown: 0.5, projectile: 'flame', splash: 0.8, vs: vs(1.6, 0.55, 0.15, 0.9), targetsGround: true, targetsAir: false, sound: 'flame' },
   { id: 'sniper', damage: 120, range: 8.5, cooldown: 2.2, projectile: 'railgun', vs: vs(1, 0.05, 0.02, 0.02), targetsGround: true, targetsAir: false, sound: 'railgun' },
 

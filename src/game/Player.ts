@@ -273,6 +273,7 @@ export class Player {
           } else {
             // no producer — refund
             this.credits += it.paid;
+            this.stats.creditsSpent -= it.paid;
           }
         }
       }

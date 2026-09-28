@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import type { GameMap } from '../game/GameMap';
+import { Terrain, type GameMap } from '../game/GameMap';
 import { registerWorldMaterial } from './materials';
+import { paletteFor, surfaceHeightAt } from './Terrain';
 
 export interface DoodadPart {
   geometry: THREE.BufferGeometry;
@@ -110,7 +111,7 @@ export class DoodadLayer {
       for (const part of parts) {
         const im = new THREE.InstancedMesh(part.geometry, part.material, b.items.length);
         b.items.forEach((d, i) => {
-          p.set(d.x, map.heightAt(d.x, d.z) - 0.02, d.z);
+          p.set(d.x, surfaceHeightAt(map, d.x, d.z) - 0.02, d.z);
           q.setFromAxisAngle(up, d.rot);
           s.setScalar(d.scale);
           m4.compose(p, q, s);
@@ -123,7 +124,88 @@ export class DoodadLayer {
         this.group.add(im);
       }
     }
+    const chunks = cliffChunks(map);
+    if (chunks) this.group.add(chunks);
   }
+}
+
+// ------------------------------------------------------------- cliff talus
+/** Jittered low-poly boulder shared by all cliff chunks. */
+function chunkGeometry() {
+  const g = new THREE.IcosahedronGeometry(1, 0);
+  const pos = g.attributes.position as THREE.BufferAttribute;
+  // jitter shared corners consistently (keyed by rounded position) so the faceted shape stays closed
+  const key = (x: number, y: number, z: number) => `${Math.round(x * 100)},${Math.round(y * 100)},${Math.round(z * 100)}`;
+  const off = new Map<string, number>();
+  let s = 7;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < pos.count; i++) {
+    const k = key(pos.getX(i), pos.getY(i), pos.getZ(i));
+    let f = off.get(k);
+    if (f === undefined) off.set(k, (f = 0.72 + rnd() * 0.5));
+    pos.setXYZ(i, pos.getX(i) * f, pos.getY(i) * f * 0.62, pos.getZ(i) * f);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * Instanced rock chunks along the foot of every cliff (inside the rock tiles, so units never clip
+ * them) plus a sparse scatter of talus on the rock masses.
+ */
+function cliffChunks(map: GameMap) {
+  const { w, h } = map;
+  const T = map.terrain;
+  const rock = (x: number, z: number) => x < 0 || z < 0 || x >= w || z >= h || T[z * w + x] === Terrain.Rock;
+  const items: { x: number; z: number; s: number; seed: number }[] = [];
+  const hash = (x: number, z: number, k: number) => {
+    let v = Math.imul(x, 73856093) ^ Math.imul(z, 19349663) ^ Math.imul(k, 83492791);
+    v = Math.imul(v ^ (v >>> 13), 1274126177);
+    return ((v ^ (v >>> 16)) >>> 0) / 4294967296;
+  };
+  const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  for (let z = 1; z < h - 1; z++)
+    for (let x = 1; x < w - 1; x++) {
+      if (!rock(x, z)) continue;
+      let edges = 0;
+      for (const [dx, dz] of N4) {
+        if (rock(x + dx, z + dz)) continue;
+        edges++;
+        // 1-2 chunks hugging the edge that faces open ground
+        const n = hash(x, z, dx * 3 + dz) < 0.3 ? 2 : 1;
+        for (let k = 0; k < n; k++) {
+          const along = hash(x, z, 10 + k + dx * 5 + dz * 7);
+          const inset = 0.12 + hash(x, z, 20 + k + dx * 5 + dz * 7) * 0.22;
+          const px = dx !== 0 ? x + 0.5 + dx * (0.5 - inset) : x + 0.1 + along * 0.8;
+          const pz = dz !== 0 ? z + 0.5 + dz * (0.5 - inset) : z + 0.1 + along * 0.8;
+          items.push({ x: px, z: pz, s: 0.08 + hash(x, z, 30 + k + dx) * 0.14, seed: items.length });
+        }
+      }
+      if (edges === 0 && hash(x, z, 99) < 0.05) items.push({ x: x + 0.2 + hash(x, z, 98) * 0.6, z: z + 0.2 + hash(x, z, 97) * 0.6, s: 0.12 + hash(x, z, 96) * 0.16, seed: items.length });
+    }
+  if (!items.length) return null;
+  const pal = paletteFor(map.theater);
+  const mat = registerWorldMaterial(new THREE.MeshStandardMaterial({ color: pal.cliff, roughness: 0.95, metalness: 0, flatShading: true }));
+  const im = new THREE.InstancedMesh(chunkGeometry(), mat, items.length);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), p = new THREE.Vector3();
+  const c = new THREE.Color();
+  items.forEach((it, i) => {
+    const r1 = hash(it.seed, 1, 2), r2 = hash(it.seed, 3, 4), r3 = hash(it.seed, 5, 6);
+    e.set((r1 - 0.5) * 0.9, r2 * Math.PI * 2, (r3 - 0.5) * 0.9);
+    q.setFromEuler(e);
+    sc.set(it.s * (0.8 + r1 * 0.5), it.s * (0.7 + r2 * 0.6), it.s * (0.8 + r3 * 0.5));
+    p.set(it.x, surfaceHeightAt(map, it.x, it.z) + it.s * 0.15, it.z);
+    m4.compose(p, q, sc);
+    im.setMatrixAt(i, m4);
+    const v = 0.9 + r2 * 0.45;
+    im.setColorAt(i, c.setRGB(v, v * (0.97 + r3 * 0.05), v * (0.95 + r1 * 0.08)));
+  });
+  im.castShadow = true;
+  im.receiveShadow = true;
+  im.instanceMatrix.needsUpdate = true;
+  if (im.instanceColor) im.instanceColor.needsUpdate = true;
+  im.computeBoundingSphere();
+  return im;
 }
 
 // ------------------------------------------------------------- crystals (dynamic)
@@ -193,7 +275,7 @@ export class CrystalLayer {
           const arr = this.meshes.get(key)!;
           const c = counts.get(key)!;
           if (c >= this.cap) return;
-          p.set(x + 0.5 + ox, map.heightAt(x + 0.5 + ox, z + 0.5 + oz) - 0.02, z + 0.5 + oz);
+          p.set(x + 0.5 + ox, surfaceHeightAt(map, x + 0.5 + ox, z + 0.5 + oz) - 0.02, z + 0.5 + oz);
           q.setFromAxisAngle(up, rot);
           s.setScalar(sc);
           m4.compose(p, q, s);

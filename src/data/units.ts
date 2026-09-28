@@ -46,7 +46,7 @@ const list: UnitDef[] = [
   },
   {
     id: 'titan', name: 'Titan Assault Tank', faction: 'aegis', category: 'vehicle', tab: 'vehicles', producer: 'factory',
-    cost: 2000, buildTime: 25, hp: 1050, armor: 'heavy', speed: 1.5, turnRate: 1.6, sight: 7, radius: 0.6,
+    cost: 2000, buildTime: 25, hp: 1150, armor: 'heavy', speed: 1.5, turnRate: 1.6, sight: 7, radius: 0.6,
     weapons: ['titanCannon', 'titanMissiles'], prereqs: ['a_factory', 'a_techlab'], hasTurret: true, turretTurnRate: 1.8, crusher: true,
     selfHeal: 2, voice: 'heavy', deathExplosion: 'large', techLevel: 3,
     description: 'Twin-cannon behemoth with anti-air missile pods. Self-repairs when damaged.',
@@ -65,7 +65,7 @@ const list: UnitDef[] = [
   },
   {
     id: 'hawk', name: 'Hawk VTOL', faction: 'aegis', category: 'aircraft', tab: 'aircraft', producer: 'airfield',
-    cost: 1200, buildTime: 16, hp: 260, armor: 'aircraft', speed: 5.5, turnRate: 3, sight: 8, radius: 0.5,
+    cost: 1200, buildTime: 16, hp: 330, armor: 'aircraft', speed: 5.5, turnRate: 3, sight: 8, radius: 0.5,
     weapons: ['hawkMissiles'], prereqs: ['a_airfield'], flying: true, ammo: 6, voice: 'pilot', deathExplosion: 'medium',
     description: 'Vertical take-off strike craft armed with guided missiles. Rearms at the Airfield.',
   },
@@ -115,7 +115,7 @@ const list: UnitDef[] = [
   },
   {
     id: 'shade', name: 'Shade Stealth Tank', faction: 'covenant', category: 'vehicle', tab: 'vehicles', producer: 'factory',
-    cost: 1000, buildTime: 14, hp: 280, armor: 'light', speed: 3.2, turnRate: 3, sight: 7, radius: 0.42,
+    cost: 900, buildTime: 13, hp: 300, armor: 'light', speed: 3.2, turnRate: 3, sight: 7, radius: 0.42,
     weapons: ['shadeRockets'], prereqs: ['c_factory', 'c_temple'], stealth: true, voice: 'vehicle', deathExplosion: 'medium', techLevel: 3,
     description: 'Cloaked rocket tank. Invisible to the enemy unless firing or adjacent.',
   },
@@ -139,7 +139,7 @@ const list: UnitDef[] = [
   },
   {
     id: 'wraith', name: 'Wraith Gunship', faction: 'covenant', category: 'aircraft', tab: 'aircraft', producer: 'airfield',
-    cost: 1100, buildTime: 15, hp: 240, armor: 'aircraft', speed: 6, turnRate: 3.4, sight: 8, radius: 0.5,
+    cost: 1100, buildTime: 15, hp: 300, armor: 'aircraft', speed: 6, turnRate: 3.4, sight: 8, radius: 0.5,
     weapons: ['wraithChaingun'], prereqs: ['c_airfield'], flying: true, ammo: 30, voice: 'pilot', deathExplosion: 'medium',
     description: 'Fast attack gunship with a rotary cannon. Rearms at the Airstrip.',
   },

@@ -267,7 +267,9 @@ export class GameRenderer {
         if (e.id === 'ionStrike') fx.ionStrike(e.x, y, e.z);
         else {
           const silo = world.buildings.find((b) => b.owner === e.player && b.def.superweapon === 'riftMissile');
-          this.nukeMissiles.push({ x: e.x, z: e.z, sx: silo?.x ?? e.x, sz: silo?.z ?? e.z, t: 0, dur: 5.5 });
+          const sx = silo?.x ?? e.x, sz = silo?.z ?? e.z;
+          // missile body, exhaust trail and target marker are handled by Effects
+          fx.riftMissile(sx, world.map.heightAt(sx, sz), sz, e.x, y, e.z, 5.5);
         }
       }),
       ev.on('superweaponImpact', (e) => {

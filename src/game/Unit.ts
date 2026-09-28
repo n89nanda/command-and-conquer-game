@@ -60,6 +60,7 @@ export class Unit extends Entity {
   lastOreZ = -1;
   harvTimer = 0;
   harvStateTime = 0;
+  oreBlacklist = new Map<number, number>();
   lastHarvState = '';
   dockRef: Building | null = null;
   // stealth
@@ -351,9 +352,11 @@ export class Unit extends Entity {
       // engage enemies encountered
       if (this.target && (this.target.dead || !isTargetable(world, this, this.target) || this.target.distTo(this.x, this.z) > this.sight + 2)) this.target = null;
       this.scanTimer -= dt;
-      if (!this.target && this.scanTimer <= 0) {
+      if (this.scanTimer <= 0 && (!this.target || (this.target.kind === 'building' && (this.target as Building).weapons.length === 0))) {
         this.scanTimer = 0.4;
-        this.target = acquireTarget(world, this, this.weapons, this.x, this.z, Math.max(maxRange(this.weapons) + 1, this.sight * 0.8));
+        const t = acquireTarget(world, this, this.weapons, this.x, this.z, Math.max(maxRange(this.weapons) + 1, this.sight * 0.8));
+        // prefer armed threats over plain structures we happen to be shooting
+        if (t && (!this.target || t.kind === 'unit' || (t as Building).weapons.length > 0)) this.target = t;
       }
       if (this.target) {
         const done = this.engage(world, dt, this.target, true);
@@ -600,7 +603,14 @@ export class Unit extends Entity {
     }
     if (!this.path && !this.needsPath) this.moveToBuilding(b, world);
     if (this.followPath(world, dt)) {
-      if (b.distTo(this.x, this.z) > 1.2) this.moveToBuilding(b, world);
+      const d2 = b.distTo(this.x, this.z);
+      if (d2 < 1.25) {
+        // arrived on a diagonal/corner tile: close enough to enter
+        this.stop();
+        world.unitEnters(this, b);
+        return;
+      }
+      this.moveToBuilding(b, world);
     }
   }
 
@@ -668,7 +678,11 @@ export class Unit extends Entity {
             this.stop();
             this.harvState = 'harvesting';
             this.harvTimer = 0;
-          } else this.harvState = 'seek';
+          } else {
+            // couldn't reach it: ignore this tile for a while
+            this.oreBlacklist.set(this.harvTile, world.time + 30);
+            this.harvState = 'seek';
+          }
         }
         return;
       }
@@ -777,7 +791,7 @@ export class Unit extends Entity {
           this.cargo -= amt;
           this.owner.credits += amt;
           this.owner.stats.creditsHarvested += amt;
-          world.events.emit('credits', { player: this.owner, amount: amt, x: r.x, z: r.z });
+          world.events.emit('credits', { player: this.owner, amount: amt, x: r.x, z: r.z, source: 'harvest' });
         }
         if (this.cargo <= 0) {
           this.cargo = 0;

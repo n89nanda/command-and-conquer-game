@@ -129,7 +129,7 @@ export class Building extends Entity {
         this.incomeTimer = 0;
         this.owner.credits += 30;
         this.owner.stats.creditsHarvested += 30;
-        world.events.emit('credits', { player: this.owner, amount: 30, x: this.x, z: this.z });
+        world.events.emit('credits', { player: this.owner, amount: 30, x: this.x, z: this.z, source: 'derrick' });
       }
     }
     // Repair pad
