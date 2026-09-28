@@ -182,6 +182,20 @@ export class Minimap {
       ctx.arc(ap.x * sc, ap.z * sc, 6 + k * 30, 0, Math.PI * 2);
       ctx.stroke();
     }
+    // objective beacons
+    for (const bc of g.beacons) {
+      if (bc.entity?.dead) continue;
+      const k = (w.time * 1.2) % 1;
+      ctx.strokeStyle = bc.color ?? '#ffd24a';
+      ctx.globalAlpha = 1 - k;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(bc.x * sc, bc.z * sc, 5 + k * 18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = bc.color ?? '#ffd24a';
+      ctx.fillRect(bc.x * sc - 3, bc.z * sc - 3, 6, 6);
+    }
     // camera frustum
     const r = g.renderer;
     const corners = [

@@ -116,6 +116,7 @@ export class Game {
   missionScript: { update(dt: number): void } | null = null;
   cinematic = false;
   alwaysRadar = false;
+  beacons: import('./mission/MissionScript').Beacon[] = [];
   private listeners: [EventTarget, string, EventListener, AddEventListenerOptions?][] = [];
 
   constructor(container: HTMLElement, world: World, hooks: GameHooks = {}) {
@@ -1203,6 +1204,50 @@ export class Game {
     for (const b of w.buildings) {
       if (b.selected || b === h) continue;
       if (b.owner === this.me && (b.repairing || w.time - b.lastHitTime < 2)) draw(b, false);
+    }
+    // objective beacons
+    for (const b of this.beacons) {
+      if (b.entity) {
+        if (b.entity.dead) continue;
+        b.x = b.entity.x;
+        b.z = b.entity.z;
+      }
+      const gy = w.map.heightAt(b.x, b.z);
+      this.renderer.project(b.x, gy + 1.6, b.z, this.scr);
+      if (!this.scr.vis) continue;
+      const pulse = (w.time * 1.2) % 1;
+      const col = b.color ?? '#ffd24a';
+      const bx = this.scr.x, by = this.scr.y + Math.sin(w.time * 3) * 3;
+      ctx.save();
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(bx, by + 12);
+      ctx.lineTo(bx - 8, by);
+      ctx.lineTo(bx, by - 12);
+      ctx.lineTo(bx + 8, by);
+      ctx.closePath();
+      ctx.globalAlpha = 0.9;
+      ctx.fill();
+      ctx.restore();
+      this.renderer.project(b.x, gy + 0.05, b.z, this.scr);
+      ctx.strokeStyle = col;
+      ctx.globalAlpha = 1 - pulse;
+      ctx.lineWidth = 2;
+      const r = 10 + pulse * 30;
+      ctx.beginPath();
+      ctx.ellipse(this.scr.x, this.scr.y, r, r * 0.55, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (b.label) {
+        ctx.font = '700 12px var(--ui-font)';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#000';
+        ctx.fillText(b.label, bx + 1, by - 17);
+        ctx.fillStyle = col;
+        ctx.fillText(b.label, bx, by - 18);
+      }
     }
     // markers
     for (const m of this.markers) {

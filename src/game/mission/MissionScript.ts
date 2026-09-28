@@ -26,6 +26,18 @@ export interface MissionHost {
   jumpTo(x: number, z: number): void;
   end(victory: boolean): void;
   playMusic(track: MusicTrack): void;
+  /** Objective map markers (drawn in the world and on the radar). */
+  beacons?: Beacon[];
+}
+
+export interface Beacon {
+  id: string;
+  /** fixed position, or an entity to follow */
+  x: number;
+  z: number;
+  entity?: Entity;
+  label?: string;
+  color?: string;
 }
 
 export type Speaker = 'announcer' | 'commander' | 'enemy' | 'ally' | 'intel';
@@ -146,7 +158,22 @@ export abstract class MissionScript {
     this.host.objectives.push({ id, text, done: false, optional });
     this.host.message((optional ? 'New optional objective: ' : 'New objective: ') + text, '#ffd76a');
   }
+  /** Place (or move) a pulsing objective marker. Cleared automatically when the objective with the same id completes/fails. */
+  beacon(id: string, at: { x: number; z: number } | Entity, label?: string, color = '#ffd24a') {
+    const list = (this.host.beacons ??= []);
+    this.clearBeacon(id);
+    const ent = (at as Entity).kind ? (at as Entity) : undefined;
+    list.push({ id, x: at.x, z: at.z, entity: ent, label, color });
+  }
+  clearBeacon(id: string) {
+    const list = this.host.beacons;
+    if (!list) return;
+    const i = list.findIndex((b) => b.id === id);
+    if (i >= 0) list.splice(i, 1);
+  }
+
   complete(id: string) {
+    this.clearBeacon(id);
     const o = this.host.objectives.find((x) => x.id === id);
     if (!o || o.done || o.failed) return;
     o.done = true;
@@ -155,6 +182,7 @@ export abstract class MissionScript {
     this.host.speak('Objective complete.', 'announcer');
   }
   fail(id: string) {
+    this.clearBeacon(id);
     const o = this.host.objectives.find((x) => x.id === id);
     if (!o || o.done || o.failed) return;
     o.failed = true;
