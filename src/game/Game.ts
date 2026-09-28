@@ -444,7 +444,8 @@ export class Game {
       if (e.button !== 0 || !this.dragStart) return;
       const r = cv.getBoundingClientRect();
       const lx = e.clientX - r.left, ly = e.clientY - r.top;
-      if (this.dragging) this.boxSelect(this.dragStart.x, this.dragStart.y, lx, ly, e.shiftKey);
+      if (this.dragging && this.mode === 'place' && this.placing && BUILDINGS[this.placing]?.wall) this.placeWallLine(this.dragStart.x, this.dragStart.y, lx, ly);
+      else if (this.dragging && this.mode === 'normal') this.boxSelect(this.dragStart.x, this.dragStart.y, lx, ly, e.shiftKey);
       else this.onLeftClick(lx, ly, e);
       this.dragStart = null;
       this.dragging = false;
@@ -918,6 +919,39 @@ export class Game {
     this.ack(units, 'move');
   }
 
+  /** Drag-place a line of wall segments; extra segments cost their price immediately. */
+  private placeWallLine(x0: number, y0: number, x1: number, y1: number) {
+    const a = this.groundAt(x0, y0), b = this.groundAt(x1, y1);
+    if (!a || !b || !this.placing) return;
+    const id = this.placing;
+    const def = BUILDINGS[id];
+    const tx0 = Math.floor(a.x), tz0 = Math.floor(a.z);
+    const tx1 = Math.floor(b.x), tz1 = Math.floor(b.z);
+    const tiles: [number, number][] = [];
+    if (Math.abs(tx1 - tx0) >= Math.abs(tz1 - tz0)) {
+      const st = Math.sign(tx1 - tx0) || 1;
+      for (let x = tx0; x !== tx1 + st; x += st) tiles.push([x, tz0]);
+    } else {
+      const st = Math.sign(tz1 - tz0) || 1;
+      for (let z = tz0; z !== tz1 + st; z += st) tiles.push([tx0, z]);
+    }
+    let placed = 0;
+    for (const [x, z] of tiles.slice(0, 24)) {
+      if (placed === 0) {
+        if (this.world.placeBuilding(this.me, id, x, z)) placed++;
+        continue;
+      }
+      if (this.me.credits < def.cost) break;
+      if (!this.world.canPlace(this.me, id, x, z)) continue;
+      this.me.credits -= def.cost;
+      this.me.stats.creditsSpent += def.cost;
+      this.world.addBuilding(this.me, id, x, z, false);
+      placed++;
+    }
+    if (placed) this.setMode('normal');
+    else audio.play('error');
+  }
+
   commandAttackMove(x: number, z: number, queue: boolean) {
     const units = this.selection.filter((s): s is Unit => s.kind === 'unit' && s.owner === this.me);
     this.formationMove(units, x, z, true, queue);
@@ -997,14 +1031,16 @@ export class Game {
       if (this.ghost) scene.remove(this.ghost);
       this.ghost = new THREE.Group();
       const m = models.building(def.id, new THREE.Color(this.me.color));
+      m.update?.(0.016, { time: 0, moving: false, speed: 0, firing: 0, health: 1, powered: true, producing: false, harvesting: false, build: 1 });
       m.root.traverse((o) => {
         const mesh = o as THREE.Mesh;
         if (mesh.isMesh) {
+          mesh.renderOrder = 7;
           const conv = (mat: THREE.Material) => {
             const c = mat.clone();
             c.transparent = true;
-            c.opacity = 0.55;
-            c.depthWrite = false;
+            c.opacity = 0.7;
+            c.depthWrite = true;
             return c;
           };
           mesh.material = Array.isArray(mesh.material) ? mesh.material.map(conv) : conv(mesh.material);
@@ -1015,8 +1051,8 @@ export class Game {
       this.ghostTiles = [];
       const tileGeo = new THREE.PlaneGeometry(0.94, 0.94).rotateX(-Math.PI / 2);
       for (let i = 0; i < def.footprint[0] * def.footprint[1]; i++) {
-        const t = new THREE.Mesh(tileGeo, new THREE.MeshBasicMaterial({ color: 0x40ff60, transparent: true, opacity: 0.35, depthWrite: false }));
-        t.renderOrder = 6;
+        const t = new THREE.Mesh(tileGeo, new THREE.MeshBasicMaterial({ color: 0x40ff60, transparent: true, opacity: 0.22, depthWrite: false }));
+        t.renderOrder = 4;
         this.ghostTiles.push(t);
         this.ghost.add(t);
       }
@@ -1036,7 +1072,7 @@ export class Game {
       for (let x = 0; x < fw; x++) {
         const t = this.ghostTiles[k++];
         const cx = tx + x, cz = tz + z;
-        t.position.set(cx + 0.5, map.heightAt(cx + 0.5, cz + 0.5) + 0.06, cz + 0.5);
+        t.position.set(cx + 0.5, map.heightAt(cx + 0.5, cz + 0.5) + 0.03, cz + 0.5);
         const tileOk = map.buildable(cx, cz) && !this.world.padAt(cx, cz) && !this.world.isReserved(cx, cz);
         (t.material as THREE.MeshBasicMaterial).color.setHex(ok ? 0x40ff60 : tileOk ? 0xffc040 : 0xff3030);
       }

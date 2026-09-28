@@ -374,7 +374,8 @@ panel('Diagnostics', el('div', { className: 'grid' },
 
 setInterval(() => {
   const info = audioDebug.info();
-  statusEl.textContent = info ? `${info.state} · ${info.sampleRate} Hz · voices ${info.activeVoices} · sfx buffers ${info.sfxBuffers} · drums ${info.drumBuffers} · worker ${info.worker}` : 'error';
+  const [lr, lp] = audioDebug.level();
+  statusEl.textContent = info ? `out ${lr.toFixed(0).padStart(4)} dB rms / ${lp.toFixed(0).padStart(4)} dB peak · ${info.state} · ${info.sampleRate} Hz · voices ${info.activeVoices} · sfx buffers ${info.sfxBuffers} · drums ${info.drumBuffers} · worker ${info.worker}` : 'error';
   const p = audioDebug.music?.currentPlayer;
   for (const [t, b] of trackBtns) b.classList.toggle('on', info?.track === t);
   nowPlaying.textContent = p ? `${p.track}  section ${TRACKS[p.track].order[p.secIdx] ?? '-'}  bar ${p.bar + 1}  pass ${p.pass}  intensity ${audioDebug.music?.intensity.toFixed(2)}${p.done ? '  (ended)' : ''}` : '-';

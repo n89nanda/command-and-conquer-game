@@ -745,7 +745,8 @@ const aRailtower: F = (team) => {
   const b = bld();
   smallSlab(b);
   b.taper('paint', P.aSteelDk, 0.66, 0.66, 0.5, 0.5, 0.16, 0, 0.06, 0);
-  b.box('paint', team, 0.56, 0.04, 0.56, 0, 0.2, 0);
+  b.box('paint', team, 0.5, 0.05, 0.5, 0, 0.19, 0);
+  b.box('paint', P.aSteelDk, 0.42, 0.012, 0.42, 0, 0.222, 0);
   b.taper('paint', P.aSteel, 0.38, 0.38, 0.22, 0.22, 0.86, 0, 0.22, 0);
   for (let k = 0; k < 4; k++) b.torus('paint', P.aGold, 0.2 - k * 0.018, 0.022, 0, 0.36 + k * 0.17, 0, Math.PI / 2, 0, 0, 4, 12);
   for (const s of [1, -1]) {
@@ -785,7 +786,8 @@ const aWall: F = () => {
     b.boxB('paint', P.aConcrete, 0.8, 0.34, 0.06, 0, 0.06, s * 0.47);
   }
   b.box('paint', 0x7e7b73, 0.92, 0.03, 0.92, 0, 0.2, 0);
-  b.box('paint', P.hazardY, 0.3, 0.012, 0.3, 0, 0.44, 0, 0, Math.PI / 4, 0);
+  b.box('paint', 0x6a675f, 0.72, 0.01, 0.02, 0, 0.442, 0);
+  b.box('paint', 0x6a675f, 0.02, 0.01, 0.72, 0, 0.442, 0);
   root.add(b.meshes());
   return finalizeTemplate(root, []);
 };

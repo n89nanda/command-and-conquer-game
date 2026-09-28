@@ -17,7 +17,8 @@ import type { DoodadKind } from '../src/render/models';
 import type { ModelInstance, ModelAnimState } from '../src/render/models/ModelTypes';
 
 const q = new URLSearchParams(location.search);
-const only = q.get('only');
+const battle = q.get('scene') === 'battle';
+const only = battle ? 'none' : q.get('only');
 const focus = q.get('focus');
 const freezeT = q.has('t') ? parseFloat(q.get('t')!) : null;
 
@@ -139,6 +140,105 @@ if (only === 'husks') {
   }
 }
 
+
+// ---------------------------------------------------------------- battle scene (hero shot)
+function placeB(id: string, team: THREE.Color, tx: number, tz: number) {
+  // tx,tz = top-left tile of footprint
+  const def = BUILDING_LIST.find((b) => b.id === id)!;
+  const [w, h] = def.footprint;
+  const m = models.building(id, team);
+  m.root.position.set(tx + w / 2, 0, tz + h / 2);
+  scene.add(m.root);
+  instances.push({ inst: m, kind: 'building', id, phase: Math.random() * 3 });
+  return m;
+}
+function placeU(id: string, team: THREE.Color, x: number, z: number, heading: number, turret = 0) {
+  const m = models.unit(id, team);
+  m.root.position.set(x, 0, z);
+  m.root.rotation.y = -heading;
+  if (m.turret) m.turret.rotation.y = turret;
+  scene.add(m.root);
+  instances.push({ inst: m, kind: 'unit', id, phase: Math.random() * 3 });
+  return m;
+}
+function placeD(kind: DoodadKind, v: number, x: number, z: number, rot = Math.random() * 6.28, s = 1) {
+  const g = new THREE.Group();
+  for (const p of doodadParts(kind, v)) {
+    const mesh = new THREE.Mesh(p.geometry, p.material);
+    mesh.castShadow = !kind.startsWith('crystal');
+    mesh.receiveShadow = true;
+    g.add(mesh);
+  }
+  g.position.set(x, 0, z);
+  g.rotation.y = rot;
+  g.scale.setScalar(s);
+  scene.add(g);
+}
+function buildBattle() {
+  const A = TEAM_A, C = TEAM_B;
+  // Aegis base (west)
+  placeB('a_yard', A, -14, -6);
+  placeB('a_power', A, -10, -7);
+  placeB('a_power', A, -10, -4);
+  placeB('a_refinery', A, -14, -1);
+  placeB('a_factory', A, -10, -1);
+  placeB('a_barracks', A, -7, -7);
+  placeB('a_radar', A, -7, -4);
+  placeB('a_turret', A, -6, 0);
+  placeB('a_tower', A, -6, 3);
+  placeB('a_sam', A, -7, -1);
+  for (let z = -8; z <= -3; z++) placeB('a_wall', A, -5, z);
+  // Covenant base (east)
+  placeB('c_yard', C, 11, -6);
+  placeB('c_power', C, 9, -8);
+  placeB('c_refinery', C, 11, -1);
+  placeB('c_factory', C, 7, -3);
+  placeB('c_barracks', C, 7, -8);
+  placeB('c_obelisk', C, 5, -1);
+  placeB('c_turret', C, 5, 2);
+  placeB('c_temple', C, 11, 3);
+  for (let z = -9; z <= -5; z++) placeB('c_wall', C, 5, z);
+  placeB('n_derrick', C, -1, -9);
+  placeB('n_bunker', C, 2, 5);
+  // crystal field (centre-south)
+  for (let i = 0; i < 26; i++) {
+    const x = -3 + Math.random() * 6, z = 2 + Math.random() * 5;
+    placeD(Math.random() < 0.15 ? 'crystalRich' : 'crystal', Math.floor(Math.random() * 4), Math.round(x) + 0.5, Math.round(z) + 0.5);
+  }
+  placeU('a_harvester', A, -2.5, 4.5, 0.4);
+  placeU('c_harvester', C, 2.4, 3.2, Math.PI + 0.3);
+  // clash in the middle
+  const ag = ['guardian', 'guardian', 'titan', 'tempest', 'scout', 'guardian'];
+  ag.forEach((id, i) => placeU(id, A, -3.2 - (i % 3) * 1.3, -4 + Math.floor(i / 3) * 1.6 + (i % 2) * 0.3, 0.1, 0.1));
+  const cg = ['scorpion', 'scorpion', 'prism', 'inferno', 'shade', 'raider', 'raider'];
+  cg.forEach((id, i) => placeU(id, C, 2.8 + (i % 3) * 1.2, -4.2 + Math.floor(i / 3) * 1.5 + (i % 2) * 0.3, Math.PI - 0.1, -0.1));
+  const ai = ['rifleman', 'rifleman', 'rifleman', 'rocketeer', 'rocketeer', 'marksman', 'a_engineer'];
+  ai.forEach((id, i) => placeU(id, A, -1.8 - (i % 4) * 0.35, -0.6 + Math.floor(i / 4) * 0.4, 0.15));
+  const ci = ['acolyte', 'acolyte', 'acolyte', 'zealot', 'zealot', 'seeker', 'seeker', 'c_engineer'];
+  ci.forEach((id, i) => placeU(id, C, 1.4 + (i % 4) * 0.35, -0.8 + Math.floor(i / 4) * 0.4, Math.PI));
+  const hk = placeU('hawk', A, -1.5, -6.5, 0.3);
+  hk.root.position.y = 1.6;
+  const wr = placeU('wraith', C, 1.8, -7.2, Math.PI + 0.4);
+  wr.root.position.y = 1.8;
+  placeU('a_mcv', A, -8.2, 5.2, -0.3);
+  placeU('c_mcv', C, 8, 7.5, Math.PI);
+  const hu = husk('guardian'); hu.root.position.set(0.2, 0, -2.6); hu.root.rotation.y = 1.2; scene.add(hu.root);
+  const hu2 = husk('scorpion'); hu2.root.position.set(-0.6, 0, -5.4); hu2.root.rotation.y = 2.2; scene.add(hu2.root);
+  const rb = rubble([2, 2]); rb.root.position.set(4, 0, 8); scene.add(rb.root);
+  // doodads around the edges
+  for (let i = 0; i < 70; i++) {
+    const x = -16 + Math.random() * 32, z = -12 + Math.random() * 24;
+    if (z > -10 && z < 9 && x > -15 && x < 14) continue;
+    const r = Math.random();
+    placeD(r < 0.4 ? 'pine' : r < 0.6 ? 'tree' : r < 0.75 ? 'bush' : r < 0.88 ? 'rock' : 'boulder', Math.floor(Math.random() * 4), x, z);
+  }
+  for (let i = 0; i < 14; i++) placeD(Math.random() < 0.5 ? 'rock' : 'bush', Math.floor(Math.random() * 4), -4 + Math.random() * 8, -9 + Math.random() * 17);
+  placeD('ruin', 1, 5.5, 6.2); placeD('barrel', 3, -4.2, 6.3); placeD('wreck', 1, 0.5, 8.4); placeD('deadTree', 1, -5.3, 7.4);
+  for (let i = 0; i < 5; i++) placeD('fence', i % 2, 0.5 + i, 7.5, 0);
+  placeD('lamp', 0, 4.5, 4.5);
+}
+if (battle) buildBattle();
+
 // flow layout
 const maxRowW = parseFloat(q.get('row') ?? '') || (focus ? 100 : only === 'buildings' ? 30 : only === 'doodads' ? 16 : 20);
 let cx = 0, cz = 0, rowD = 0;
@@ -235,7 +335,13 @@ camera.position.set(
 );
 camera.lookAt(target);
 
-const shadowR = Math.max(totalW, totalD) * 0.62 + 2;
+if (battle) {
+  const bd = parseFloat(q.get('dist') ?? '34');
+  const bt = new THREE.Vector3(parseFloat(q.get('tx') ?? '0'), 0, parseFloat(q.get('tz') ?? '0'));
+  camera.position.set(bt.x + Math.sin(yaw) * Math.cos(pitch) * bd, Math.sin(pitch) * bd, bt.z + Math.cos(yaw) * Math.cos(pitch) * bd);
+  camera.lookAt(bt);
+}
+const shadowR = battle ? 22 : Math.max(totalW, totalD) * 0.62 + 2;
 sun.position.set(-shadowR * 0.6, shadowR * 1.4, shadowR * 0.45);
 sun.shadow.camera.left = -shadowR;
 sun.shadow.camera.right = shadowR;
@@ -285,3 +391,36 @@ function frame() {
 }
 frame();
 (window as unknown as { __ready: boolean }).__ready = true;
+
+// ---------------------------------------------------------------- per-model stats (?stats=1 prints to console)
+if (q.get('stats') === '1') {
+  const count = (o: THREE.Object3D) => {
+    let meshes = 0, tris = 0;
+    o.traverse((c) => {
+      const m = c as THREE.Mesh;
+      if (m.isMesh) {
+        meshes++;
+        tris += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
+      }
+    });
+    return { meshes, tris: Math.round(tris) };
+  };
+  const rows: string[] = [];
+  for (const u of UNIT_LIST) {
+    const m = models.unit(u.id, TEAM_A);
+    const c = count(m.root);
+    rows.push(`unit ${u.id.padEnd(12)} meshes=${c.meshes} tris=${c.tris} h=${m.height.toFixed(2)} muzzles=${m.muzzles.length} turret=${!!m.turret}`);
+  }
+  for (const b of BUILDING_LIST) {
+    const m = models.building(b.id, TEAM_A);
+    const c = count(m.root);
+    const box = new THREE.Box3().setFromObject(m.root);
+    rows.push(`bld  ${b.id.padEnd(12)} meshes=${c.meshes} tris=${c.tris} h=${m.height.toFixed(2)} fp=${b.footprint.join('x')} ext=[${box.min.x.toFixed(2)},${box.max.x.toFixed(2)}]x[${box.min.z.toFixed(2)},${box.max.z.toFixed(2)}] turret=${!!m.turret}`);
+  }
+  for (const k of DOODAD_KINDS) for (let v = 0; v < 4; v++) {
+    const parts = doodadParts(k as DoodadKind, v);
+    const tris = parts.reduce((a, p) => a + p.geometry.attributes.position.count / 3, 0);
+    rows.push(`dood ${k.padEnd(12)} v${v} parts=${parts.length} tris=${tris}`);
+  }
+  console.log(rows.join('\n'));
+}

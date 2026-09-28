@@ -126,8 +126,10 @@ export class World {
   }
 
   private processPaths() {
-    let budget = 14;
-    while (budget-- > 0 && this.pathQueue.length) {
+    // time-budgeted so large group orders never cause a frame hitch
+    const deadline = performance.now() + 2.5;
+    let n = 0;
+    while (this.pathQueue.length && (n++ < 2 || performance.now() < deadline)) {
       const u = this.pathQueue.shift()!;
       if (u.dead || !u.needsPath) continue;
       const path = this.pathfinder.find(u.x, u.z, u.goalX, u.goalZ, 9000, u.pathIgnoreBuilding);

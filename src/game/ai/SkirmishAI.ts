@@ -135,6 +135,8 @@ interface Squad {
   fightX: number;
   fightZ: number;
   lastEngageT: number;
+  /** reinforcement group heading to join this squad */
+  join: Squad | null;
 }
 
 interface SeenUnit {
@@ -777,6 +779,21 @@ export class SkirmishAI {
     return c;
   }
 
+  /** Do our harvesters currently work far away from every refinery? */
+  private harvestersFar(): boolean {
+    let far = 0, n = 0;
+    const m = this.world.map;
+    for (const u of this.my) {
+      if (!u.def.harvester || u.harvTile < 0) continue;
+      n++;
+      const tx = u.harvTile % m.w, tz = Math.floor(u.harvTile / m.w);
+      let d = Infinity;
+      for (const b of this.myBuildings) if (b.def.refinery) d = Math.min(d, Math.hypot(b.x - tx, b.z - tz));
+      if (d > 22) far++;
+    }
+    return n > 0 && far * 2 >= n;
+  }
+
   private harvesterCount(): number {
     let n = 0;
     for (const u of this.my) if (u.def.harvester) n++;
@@ -853,6 +870,18 @@ export class SkirmishAI {
       if (this.refinerySiteOk()) {
         const r = pick(kit.byRole.refinery);
         if (r) return r;
+      }
+    }
+    // floating money: more production first
+    if (credits > 3000 && this.now > 360) {
+      const fMax = this.difficulty === 'brutal' || this.difficulty === 'hard' ? 3 : 2;
+      if (has('factory') < fMax) {
+        const f = pick(kit.byRole.factory);
+        if (f) return f;
+      }
+      if (has('barracks') < 2 && credits > 4000) {
+        const f = pick(kit.byRole.barracks);
+        if (f) return f;
       }
     }
     // core tech
@@ -1007,7 +1036,7 @@ export class SkirmishAI {
       }
     }
     // ---- expansion with an MCV toward a fresh ore field
-    if (mcv && this.P.expand && !this.opts.passive && this.expansionTarget && this.now > 480 && p.credits > 4000) {
+    if (mcv && this.P.expand && !this.opts.passive && this.expansionTarget && this.now > 420 && p.credits > (this.harvestersFar() ? 2200 : 4000)) {
       const yards = this.myBuildings.filter((b) => b.def.produces === 'yard').length;
       const maxYards = this.difficulty === 'normal' ? 2 : 3;
       const q = p.queues.vehicles;
@@ -1072,7 +1101,8 @@ export class SkirmishAI {
     const n = this.defenseCount();
     const timeCap = Math.floor(1 + this.now / 150);
     const pressure = this.now - this.lastThreatT < 60 || this.now - this.lastSquadLost < 90 ? 2 : 0;
-    const cap = Math.min(this.P.maxDefenses + (this.opts.passive ? 4 : 0) + pressure, timeCap + pressure);
+    const rich = this.player.credits > 5000 || this.armyUnits().length >= this.P.armyCap - 2 ? 4 : 0;
+    const cap = Math.min(this.P.maxDefenses + (this.opts.passive ? 4 : 0) + pressure + rich, timeCap + pressure + rich);
     const mix = this.enemyMix();
     const airSeen = mix.aircraft > 0.05;
     const aaDefs = this.myBuildings.filter((b) => b.weapons.length && b.weapons.every((w) => !w.def.targetsGround)).length;
@@ -1213,6 +1243,14 @@ export class SkirmishAI {
         if (ui?.role === 'artillery') arty++;
       }
     const total = Math.max(1, army.length);
+    // raiders for harassment (hard+)
+    const scout = this.kit.scoutUnit;
+    if (tab === 'vehicles' && scout && this.P.harass && !this.opts.passive && this.now > (this.P.earlyHarass ? 90 : 240) && this.canBuild(scout.def.id)) {
+      let fast = 0;
+      for (const u of army) if (unitInfo(u.def).fast) fast++;
+      for (const it of this.player.queues.vehicles.items) if (this.kit.unit[it.defId]?.fast) fast++;
+      if (fast < 2 && this.now - this.lastHarass > 60) return scout.def.id;
+    }
     const opts: { id: string; s: number }[] = [];
     for (const ui of this.kit.combatUnits) {
       const d = ui.def;
@@ -1491,29 +1529,32 @@ export class SkirmishAI {
     return this.P.firstAttack / this.aggression;
   }
 
+  /** Value of the enemy army we know about (seen recently and not known dead). */
+  private enemyArmyEstimate(): number {
+    let v = 0;
+    for (const s of this.seen.values()) {
+      if (s.unit.dead || this.now - s.t > 180) continue;
+      if (s.def.harvester || s.def.mcv || s.def.weapons.length === 0) continue;
+      v += s.def.cost;
+    }
+    return v;
+  }
+
   private maybeAttack() {
     if (this.opts.passive) return;
     const pool = this.my.filter((u) => this.st(u).job === 'pool' && this.isCombat(u));
     if (this.now < this.firstAttackTime()) {
-      // exception: if the pool is huge (lots of starting money), attack earlier
-      if (pool.length < this.P.waveMax * 2) return;
+      // exception: a huge idle army (lots of starting money) attacks earlier
+      if (this.difficulty === 'easy' || pool.length < Math.max(30, this.P.waveMax * 2)) return;
     }
-    const active = this.squads.filter((s) => s.kind === 'attack' && s.units.length > 0);
-    // reinforce the active wave
-    if (this.P.reinforce && active.length > 0 && pool.length >= (this.P.micro ? 3 : 5) && this.now - this.lastThreatT > 10) {
-      const sq = active[0];
-      const c = this.centroid(sq.units);
-      // only if the squad is not about to die and the way is roughly clear
-      if (c && sq.units.length >= 3) {
-        for (const u of pool) {
-          this.setJob(u, 'squad');
-          this.st(u).squad = sq;
-          sq.units.push(u);
-        }
-        sq.startValue += pool.reduce((a, u) => a + this.value(u), 0);
-        this.say(`reinforces squad ${sq.id} with ${pool.length} units`);
-        return;
-      }
+    const active = this.squads.filter((s) => s.kind === 'attack' && s.units.length >= 3);
+    const reinforceMin = this.P.micro ? 4 : 6;
+    // reinforce the active wave: the reinforcements travel as their own group and merge on arrival
+    if (this.P.reinforce && active.length > 0 && pool.length >= reinforceMin && this.now - this.lastThreatT > 10) {
+      const main = active[0];
+      const sq = this.createSquad('attack', pool, main);
+      if (sq) this.say(`sends ${pool.length} reinforcements to squad ${main.id}`);
+      return;
     }
     if (this.now - this.lastAttackT < this.P.minAttackGap / this.aggression) return;
     if (this.now - this.lastThreatT < 8) return;
@@ -1521,21 +1562,26 @@ export class SkirmishAI {
     const cap = Math.min(this.P.armyCap - 4, this.P.waveMax * 1.6);
     if (pool.length < want && pool.length < cap) return;
     if (pool.length === 0) return;
+    // don't suicide into a much bigger army we have seen (normal+)
+    const ratio = this.difficulty === 'easy' ? 0 : this.difficulty === 'normal' ? 0.6 : 0.85;
+    const poolV = pool.reduce((a, u) => a + this.value(u), 0);
+    const est = this.enemyArmyEstimate();
+    if (poolV < est * ratio && pool.length < cap && this.now - Math.max(this.lastAttackT, this.firstAttackTime()) < 240) return;
     const sq = this.createSquad('attack', pool);
     if (!sq) return;
     this.waves++;
     this.lastAttackT = this.now;
     this.stats.attacks++;
-    this.say(`launches attack wave #${this.waves} (${pool.length} units) toward ${sq.objective ? sq.objective.name : 'enemy territory'}`);
+    this.say(`launches attack wave #${this.waves} (${pool.length} units, value ${poolV.toFixed(0)} vs est. ${est.toFixed(0)}) toward ${sq.objective ? sq.objective.name : 'enemy territory'}`);
   }
 
-  private createSquad(kind: 'attack' | 'harass', units: Unit[]): Squad | null {
+  private createSquad(kind: 'attack' | 'harass', units: Unit[], join: Squad | null = null): Squad | null {
     const c = this.centroid(units);
     if (!c) return null;
     const sq: Squad = {
       id: squadIds++, kind, units: [...units], state: 'advance', objective: null, objX: c.x, objZ: c.z, path: [], wp: 0,
       startValue: units.reduce((a, u) => a + this.value(u), 0), created: this.now, regroupT: -999,
-      lastCx: c.x, lastCz: c.z, progressT: this.now, fightX: 0, fightZ: 0, lastEngageT: -999,
+      lastCx: c.x, lastCz: c.z, progressT: this.now, fightX: 0, fightZ: 0, lastEngageT: -999, join,
     };
     for (const u of units) {
       this.setJob(u, kind === 'harass' ? 'harass' : 'squad');
@@ -1580,7 +1626,12 @@ export class SkirmishAI {
 
   /** Pick the squad's next objective and plan a route to it. */
   private retarget(sq: Squad, fx: number, fz: number) {
-    const obj = sq.kind === 'harass' ? this.harassObjective(fx, fz) : this.chooseObjective(fx, fz);
+    let obj = sq.kind === 'harass' ? this.harassObjective(fx, fz) : this.chooseObjective(fx, fz);
+    if (sq.join) {
+      const jc = sq.join.units.length ? this.centroid(sq.join.units) : null;
+      if (jc) obj = { entity: null, x: jc.x, z: jc.z };
+      else sq.join = null;
+    }
     sq.objective = obj.entity;
     sq.objX = obj.x;
     sq.objZ = obj.z;
@@ -1693,6 +1744,23 @@ export class SkirmishAI {
       // units may have been reassigned (defence / repair)
       sq.units = sq.units.filter((u) => !u.dead && this.st(u).squad === sq);
       if (sq.units.length === 0) continue;
+      if (sq.join) {
+        const target = sq.join;
+        target.units = target.units.filter((u) => !u.dead && this.st(u).squad === target);
+        const a = this.centroid(sq.units), b = target.units.length ? this.centroid(target.units) : null;
+        if (!b) {
+          sq.join = null; // the main group is gone: carry on as a normal wave
+          this.retarget(sq, a ? a.x : this.cx, a ? a.z : this.cz);
+        } else if (a && Math.hypot(a.x - b.x, a.z - b.z) < 10) {
+          for (const u of sq.units) {
+            this.st(u).squad = target;
+            target.units.push(u);
+          }
+          target.startValue += sq.startValue;
+          sq.units = [];
+          continue;
+        } else if (a && Math.hypot(sq.objX - b.x, sq.objZ - b.z) > 12) this.retarget(sq, a.x, a.z);
+      }
       this.updateSquad(sq);
     }
     this.squads = this.squads.filter((s) => s.units.length > 0);
@@ -2119,6 +2187,32 @@ export class SkirmishAI {
         if (c) u.issue({ type: 'harvest', x: c.x, z: c.z }, this.world);
         else u.issue({ type: 'harvest' }, this.world);
         continue;
+      }
+      // long hauls: send harvesters to a rich field close to one of our refineries instead
+      if ((u.harvState === 'toOre' || u.harvState === 'seek') && u.harvTile >= 0 && this.difficulty !== 'easy') {
+        const m = this.world.map;
+        const tx = u.harvTile % m.w, tz = Math.floor(u.harvTile / m.w);
+        let nearRef = Infinity;
+        for (const b of this.myBuildings) if (b.def.refinery) nearRef = Math.min(nearRef, Math.hypot(b.x - tx, b.z - tz));
+        if (nearRef > 20) {
+          let best: OreCell | null = null;
+          let bs = Infinity;
+          for (const c of this.oreCells) {
+            if (c.ore < 2500) continue;
+            for (const b of this.myBuildings) {
+              if (!b.def.refinery) continue;
+              const d = Math.hypot(b.x - c.x, b.z - c.z);
+              if (d < 16 && d < bs && this.dangerAt(c.x, c.z, 9) < 500) {
+                bs = d;
+                best = c;
+              }
+            }
+          }
+          if (best && bs + 4 < nearRef) {
+            u.issue({ type: 'harvest', x: best.x, z: best.z }, this.world);
+            continue;
+          }
+        }
       }
       // keep harvesters away from fields we know are dangerous
       if (u.harvState === 'toOre' && u.harvTile >= 0 && this.P.micro) {

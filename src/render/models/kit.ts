@@ -81,6 +81,8 @@ export const GLOW = {
   fire: 0xff7a1e,
 } as const;
 export type GlowName = keyof typeof GLOW;
+/** Per-colour gain so bright hues (teal, white) don't blow out to white under ACES. */
+const GLOW_GAIN: Partial<Record<GlowName, number>> = { teal: 0.6, white: 0.75, green: 0.7, amber: 0.9, red: 1.2, orange: 1.05, violet: 1.2, blue: 0.9 };
 
 type AnimKind = 'blink' | 'blinkB' | 'pulse' | 'pulseFast' | 'flicker';
 const matCache = new Map<string, THREE.MeshStandardMaterial>();
@@ -103,7 +105,9 @@ export function mat(key: string): THREE.MeshStandardMaterial {
     const [, name, mod] = key.split(':');
     const hex = name.startsWith('#') ? parseInt(name.slice(1), 16) : GLOW[name as GlowName] ?? 0xffffff;
     const base = name === 'win' || name === 'winWarm' ? 1.0 : 1.8;
-    const intensity = mod === 'dim' ? base * 0.1 : mod === 'hot' ? base * 1.7 : base;
+    const gain = name.startsWith('#') ? 0.9 : GLOW_GAIN[name as GlowName] ?? 1;
+    const lvl = base * gain;
+    const intensity = mod === 'dim' ? lvl * 0.1 : mod === 'hot' ? lvl * 1.7 : lvl;
     const col = new THREE.Color(hex);
     m = makeStd({
       color: col.clone().multiplyScalar(mod === 'dim' ? 0.25 : 0.35),
@@ -127,7 +131,7 @@ export function mat(key: string): THREE.MeshStandardMaterial {
         m = makeStd({ vertexColors: true, roughness: 0.88, metalness: 0.0, flatShading: true });
         break;
       case 'charred':
-        m = makeStd({ vertexColors: true, color: 0x2a2624, roughness: 0.96, metalness: 0.15 });
+        m = makeStd({ vertexColors: true, color: 0x4a4440, roughness: 0.95, metalness: 0.1 });
         break;
       case 'glass':
         m = makeStd({ vertexColors: true, roughness: 0.08, metalness: 0.4 });

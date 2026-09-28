@@ -606,7 +606,10 @@ const cFlak: F = (team) => {
   const b = bld();
   smallPlinth(b, team);
   b.taper('paint', P.cGun, 0.66, 0.66, 0.5, 0.5, 0.16, 0, 0.07, 0);
-  b.box('paint', P.cRed, 0.52, 0.02, 0.52, 0, 0.22, 0);
+  for (const k of [1, -1]) {
+    b.box('paint', P.cRed, 0.5, 0.012, 0.03, 0, 0.232, k * 0.235);
+    b.box('paint', P.cRed, 0.03, 0.012, 0.44, k * 0.235, 0.232, 0);
+  }
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
     spike(b, 'paint', P.cBlack, Math.cos(a) * 0.36, 0.07, Math.sin(a) * 0.36, 0.3, 0.04, Math.sin(a) * 0.3, -Math.cos(a) * 0.3);
@@ -641,7 +644,10 @@ const cObelisk: F = (team) => {
   const b = bld();
   smallPlinth(b, team);
   b.taper('paint', P.cGun, 0.72, 0.72, 0.54, 0.54, 0.14, 0, 0.07, 0);
-  b.box('paint', P.cRed, 0.55, 0.02, 0.55, 0, 0.21, 0);
+  for (const k of [1, -1]) {
+    b.box('paint', P.cRed, 0.54, 0.012, 0.03, 0, 0.212, k * 0.255);
+    b.box('paint', P.cRed, 0.03, 0.012, 0.48, k * 0.255, 0.212, 0);
+  }
   // obelisk shaft with a slanted crystal face towards +X
   const H = 1.45;
   b.hull('paint', P.cBlack, [
@@ -665,7 +671,7 @@ const cObelisk: F = (team) => {
   for (let i = 0; i < 4; i++) g.box('e:red:pulse', 0, 0.022, 0.03, 0.2 - i * 0.02, 0.18 - i * 0.04, 0.4 + i * 0.28, 0, 0, 0, ang);
   root.add(node('glow', g));
   const tip = new B({ aoHeight: 0 });
-  tip.add(new THREE.OctahedronGeometry(0.07, 0), 'e:red:pulse', 0, T(0, 0, 0, 0, 0, 0, 1.2, 1.5, 1));
+  tip.add(new THREE.OctahedronGeometry(0.09, 0), 'e:red:pulse', 0, T(0, 0, 0, 0, 0, 0, 1.2, 1.6, 1.2));
   const tipY = H + 0.02;
   root.add(node('tip', tip, 0.06, tipY, 0));
   return finalizeTemplate(root, [new THREE.Vector3(0.1, tipY, 0)], bAnim({
@@ -691,7 +697,8 @@ const cWall: F = (team) => {
     b.hull('paint', P.cGun, [[-0.3, 0.06, s * 0.44], [-0.3, 0.06, s * 0.5], [0.3, 0.06, s * 0.44], [0.3, 0.06, s * 0.5], [-0.24, 0.36, s * 0.34], [-0.24, 0.36, s * 0.5], [0.24, 0.36, s * 0.34], [0.24, 0.36, s * 0.5]]);
   }
   b.taper('paint', P.cBlack, 0.66, 0.66, 0.5, 0.5, 0.06, 0, 0.44, 0);
-  spike(b, 'paint', P.cGunLt, 0, 0.5, 0, 0.26, 0.12);
+  b.hull('paint', P.cGunLt, [[-0.3, 0.5, -0.05], [0.3, 0.5, -0.05], [-0.3, 0.5, 0.05], [0.3, 0.5, 0.05], [-0.2, 0.72, 0], [0.12, 0.66, 0], [0.26, 0.56, 0]]);
+  b.hull('paint', P.cGun, [[-0.05, 0.5, -0.3], [-0.05, 0.5, 0.3], [0.05, 0.5, -0.3], [0.05, 0.5, 0.3], [0, 0.66, -0.16], [0, 0.62, 0.2]]);
   for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) spike(b, 'paint', P.cBlack, sx * 0.26, 0.44, sz * 0.26, 0.14, 0.05, sz * 0.3, -sx * 0.3);
   b.box('paint', team, 0.2, 0.012, 0.2, 0, 0.44, 0, 0, Math.PI / 4, 0);
   root.add(b.meshes());

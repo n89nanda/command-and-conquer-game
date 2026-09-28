@@ -113,6 +113,14 @@ export class App {
     bar.style.width = '100%';
     await new Promise((r) => setTimeout(r, 150));
     const params = new URLSearchParams(location.search);
+    const mid = params.get('mission');
+    if (mid) {
+      const m = [...CAMPAIGNS.aegis, ...CAMPAIGNS.covenant].find((x) => x.id === mid);
+      if (m) {
+        this.startMission(m);
+        return;
+      }
+    }
     if (params.get('quick')) {
       this.startSkirmish({ ...this.lastSkirmish, startUnits: params.get('base') ? 'base' : this.lastSkirmish.startUnits });
       return;

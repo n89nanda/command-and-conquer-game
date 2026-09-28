@@ -29,6 +29,7 @@ interface MatchSetup {
   credits: number;
   quiet: boolean;
   log: boolean;
+  seed: number;
 }
 
 interface MatchResult {
@@ -41,6 +42,8 @@ interface MatchResult {
   ticks: number;
   error?: string;
   stuck: string[];
+  seed: number;
+  final: string[];
 }
 
 const args = process.argv.slice(2);
@@ -59,7 +62,19 @@ function fmt(t: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/** Deterministic Math.random so a match can be replayed with --seed. */
+function seedRandom(seed: number) {
+  let st = seed >>> 0 || 1;
+  Math.random = () => {
+    let t = (st += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function runMatch(setup: MatchSetup): MatchResult {
+  seedRandom(setup.seed);
   const spec = SKIRMISH_MAPS.find((m) => m.id === setup.mapId)!;
   const n = spec.players === 2 ? 2 : spec.players;
   const players = Array.from({ length: n }, (_, i) => ({
@@ -177,8 +192,15 @@ function runMatch(setup: MatchSetup): MatchResult {
     ticks: tick,
     error,
     stuck,
+    seed: setup.seed,
+    final: active.map((p, i) => {
+      const us = world.units.filter((u) => u.owner === p && !u.dead);
+      const bs = world.buildings.filter((b) => b.owner === p && !b.dead);
+      return `${p.name}: units ${us.length} (${[...new Set(us.map((u) => u.def.id))].join(',')}) at ${us.slice(0, 3).map((u) => `${u.x.toFixed(0)},${u.z.toFixed(0)}`).join(' ')} buildings ${bs.length} (${bs.slice(0, 4).map((b) => `${b.def.id}@${b.tx},${b.tz}`).join(' ')}) cr ${Math.round(p.credits)} | ${defeatedAt[i] >= 0 ? 'defeated' : ais[i].debugState()}`;
+    }),
   };
   if (!setup.quiet) {
+    console.log(`  seed ${setup.seed}`);
     console.log(`  RESULT: ${winner ? `${winner.name} [${winner.faction}/${players[active.indexOf(winner)].difficulty}] wins` : 'no winner'} after ${fmt(world.time)} (sim ${(simMs / 1000).toFixed(1)}s)`);
     for (const pl of res.players)
       console.log(
@@ -195,6 +217,7 @@ const minutes = Number(pos[1] ?? 40);
 const credits = Number(flag('credits') ?? 5000);
 const quiet = has('quiet');
 const log = has('log');
+let seed = Number(flag('seed') ?? Date.now() % 100000);
 const maps = !pos[0] || pos[0] === 'all' ? SKIRMISH_MAPS.map((m) => m.id) : pos[0].split(',');
 
 const results: MatchResult[] = [];
@@ -206,19 +229,23 @@ if (has('batch')) {
     for (const dp of diffPairs)
       for (const fp of facPairs.slice(0, dp[0] === dp[1] ? 2 : 2))
         for (let r = 0; r < reps; r++) {
-          const res = runMatch({ mapId, factions: fp, diffs: dp, minutes, credits, quiet: true, log: false });
+          const res = runMatch({ mapId, factions: fp, diffs: dp, minutes, credits, quiet: true, log: false, seed: seed++ });
           results.push(res);
           const w = res.winner ? `${res.players[res.winnerIdx].faction}/${res.players[res.winnerIdx].diff}` : 'none';
           const perf = res.players.map((p) => (p.aiMs / Math.max(1, res.ticks)).toFixed(3)).join('/');
           console.log(
             `${mapId.padEnd(12)} ${res.players.map((p) => `${p.faction}/${p.diff}`).join(' vs ').padEnd(40)} -> ${w.padEnd(16)} ${fmt(res.duration)} sim ${(res.simMs / 1000).toFixed(1)}s ai ${perf}ms/tick` +
-              (res.error ? ' ERROR' : '') + (res.stuck.length ? ` stuck:${res.stuck.length}` : ''),
+              (res.error ? ' ERROR' : '') + (res.stuck.length ? ` stuck:${res.stuck.length}` : '') + ` seed ${res.seed}`,
           );
+          if (!res.winner || has('verbose')) {
+            for (const l of res.stuck.slice(-4)) console.log('      ' + l.slice(0, 400));
+            for (const l of res.final) console.log('      ' + l.slice(0, 500));
+          }
         }
 } else {
   const factions = (flag('fac') ?? 'aegis,covenant').split(',') as FactionId[];
   const diffs = (flag('diff') ?? 'normal').split(',') as Difficulty[];
-  for (const mapId of maps) results.push(runMatch({ mapId, factions, diffs, minutes, credits, quiet, log }));
+  for (const mapId of maps) results.push(runMatch({ mapId, factions, diffs, minutes, credits, quiet, log, seed: seed++ }));
 }
 
 // ------------------------------------------------------------------ summary

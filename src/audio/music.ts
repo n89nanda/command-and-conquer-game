@@ -163,6 +163,18 @@ function voicing(pcs: number[], low: number, prev: number[] | null): number[] {
   return best;
 }
 
+/** StereoPanner with a plain-gain fallback for very old WebKit. */
+function panner(c: BaseAudioContext, pan: number): AudioNode {
+  if (typeof c.createStereoPanner === 'function') {
+    const p = c.createStereoPanner();
+    p.pan.value = pan;
+    return p;
+  }
+  const g = c.createGain();
+  g.gain.value = 0.85;
+  return g;
+}
+
 function makeCurve(k: number, asym = 0, n = 2048): Float32Array<ArrayBuffer> {
   const c = new Float32Array(n);
   const norm = Math.tanh(k * (1 + asym));
@@ -374,10 +386,8 @@ class Player {
     scoop.connect(pres);
     pres.connect(cab);
     cab.connect(cab2);
-    const pL = c.createStereoPanner();
-    pL.pan.value = -0.55;
-    const pR = c.createStereoPanner();
-    pR.pan.value = 0.55;
+    const pL = panner(c, -0.55);
+    const pR = panner(c, 0.55);
     const dbl = c.createDelay(0.1);
     dbl.delayTime.value = 0.016;
     cab2.connect(pL);
@@ -450,8 +460,7 @@ class Player {
       g.gain.value = DRUM_GAIN[d] ?? 0.6;
       const p = DRUM_PAN[d];
       if (p) {
-        const pn = c.createStereoPanner();
-        pn.pan.value = p;
+        const pn = panner(c, p);
         g.connect(pn);
         pn.connect(this.layerIn[DRUM_LAYER[d]]);
       } else g.connect(this.layerIn[DRUM_LAYER[d]]);
@@ -571,9 +580,11 @@ class Player {
       this.drum('crash', t, 0.75);
     }
     if (sec.riser && step === 0 && bar === sec.bars - sec.riser) this.riser(t, sec.riser * barDur);
-    if (sec.revCrash && step === 0 && bar === sec.bars - 1) {
+    if (sec.revCrash && step === 0 && bar === Math.max(0, sec.bars - 2)) {
+      // reversed cymbal swelling into the next section's downbeat
       const buf = this.sh.kit()?.rcrash;
-      if (buf) this.drum('rcrash', t + barDur - buf.duration, 0.9);
+      const secEnd = t + (sec.bars - bar) * barDur;
+      if (buf) this.drum('rcrash', Math.max(t, secEnd - buf.duration), 0.9, 1, Math.max(0, buf.duration - (secEnd - t)));
     }
     if (sec.drone && step === 0 && bar % 4 === 0) {
       const bars = Math.min(4, sec.bars - bar);
@@ -770,7 +781,7 @@ class Player {
     return o;
   }
 
-  drum(name: DrumName, t: number, vel: number, rate = 1) {
+  drum(name: DrumName, t: number, vel: number, rate = 1, offset = 0) {
     const kit = this.sh.kit();
     const buf = kit?.[name];
     const ch = this.drumCh.get(name);
@@ -783,9 +794,9 @@ class Player {
     g.gain.value = vel;
     s.connect(g);
     g.connect(ch);
-    let off = 0;
+    let off = offset;
     if (t < c.currentTime) {
-      off = c.currentTime - t;
+      off += c.currentTime - t;
       t = c.currentTime;
     }
     if (off < buf.duration) s.start(t, off);
@@ -928,6 +939,14 @@ class Player {
       if (o.type !== 'square' || inst === 'square') o.connect(flt);
       vib.connect(o.detune);
     }
+    // release the shared LFO's fan-out once the note is over (avoids keeping dead nodes alive)
+    oscs[0].onended = () => {
+      try {
+        this.leadLfo.disconnect(vib);
+      } catch {
+        /* ignore */
+      }
+    };
     flt.connect(g);
     g.connect(out);
   }
@@ -992,7 +1011,16 @@ class Player {
       const dets = choir ? [-12, 0, 12] : [-10, 10];
       for (const d of dets) {
         const o = this.osc('sawtooth', f, t, stop, d);
-        if (choir) this.choirLfo.connect(o.detune);
+        if (choir) {
+          this.choirLfo.connect(o.detune);
+          o.onended = () => {
+            try {
+              this.choirLfo.disconnect(o.detune);
+            } catch {
+              /* ignore */
+            }
+          };
+        }
         o.connect(g);
       }
     }

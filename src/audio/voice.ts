@@ -149,8 +149,9 @@ export class VoiceManager {
       if (!synth) return;
       const now = this.hooks.now();
       const line: Line = { text: text.trim(), kind, faction, prio: priority, at: now };
-      const key = `${kind === 'announcer' ? 'A' : 'U'}:${line.text.toLowerCase()}`;
-      if (kind === 'announcer') {
+      const radio = kind === 'announcer' || priority >= 3; // announcer + scripted mission dialogue are queued
+      const key = `${radio ? 'A' : 'U'}:${line.text.toLowerCase()}`;
+      if (radio) {
         const last = this.recent.get(key);
         if (last !== undefined && now - last < 3) return;
         if (this.current?.line.text === line.text || this.queue.some((q) => q.text === line.text)) return;
@@ -162,7 +163,8 @@ export class VoiceManager {
         }
         if (this.current) {
           const cur = this.current.line;
-          if (cur.kind !== 'announcer' || line.prio > cur.prio) {
+          const curIsChatter = cur.kind !== 'announcer' && cur.prio < 3;
+          if (curIsChatter || line.prio > cur.prio) {
             // announcer beats unit chatter; higher priority interrupts lower
             this.queue = this.queue.filter((q) => q.prio >= line.prio);
             this.enqueue(line, true);
@@ -192,7 +194,7 @@ export class VoiceManager {
       while (i > 0 && this.queue[i - 1].prio < line.prio) i--;
       this.queue.splice(i, 0, line);
     }
-    while (this.queue.length > 2) {
+    while (this.queue.length > 3) {
       // drop the lowest priority, newest-first among equals keeps older context? drop the oldest lowest.
       let worst = 0;
       for (let k = 1; k < this.queue.length; k++) {

@@ -13,7 +13,7 @@ const nDerrick: F = (team) => {
   const b = new B({ aoHeight: 0.4, aoMin: 0.5 });
   // compacted dirt pad + oily stain
   b.cboxB('matte', 0x6e5f47, 1.9, 0.05, 1.9, 0.02, 0, 0, 0);
-  b.cyl('matte', 0x2a2420, 0.4, 0.45, 0.012, 12, 0.2, 0.056, 0.3);
+  b.cyl('matte', 0x2a2420, 0.26, 0.3, 0.008, 12, 0.35, 0.054, 0.3);
   // derrick tower
   const dx = -0.5, dz = -0.45;
   b.boxB('paint', P.aConcreteDk, 0.5, 0.06, 0.5, dx, 0.05, dz);

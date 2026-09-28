@@ -62,6 +62,8 @@ class AudioEngine implements AudioEngineApi {
   private ctx: AudioContext | null = null;
   private vols: Volumes = { ...DEFAULT_VOLUMES };
   private master: GainNode | null = null;
+  private post: GainNode | null = null;
+  private analyser: AnalyserNode | null = null;
   private sfxBus: GainNode | null = null;
   private musicBus: GainNode | null = null;
   private musicDuck: GainNode | null = null;
@@ -107,14 +109,16 @@ class AudioEngine implements AudioEngineApi {
 
   unlock(): void {
     try {
-      if (this.failed) return;
-      if (!this.ctx) this.init();
+      if (!this.failed && !this.ctx) this.init();
       const c = this.ctx;
-      if (!c) return;
-      if (c.state !== 'running') c.resume().catch(() => undefined);
-      this.voice.unlock();
+      if (c && c.state !== 'running') c.resume().catch(() => undefined);
     } catch {
       /* never throw */
+    }
+    try {
+      this.voice.unlock();
+    } catch {
+      /* ignore */
     }
   }
 
@@ -151,6 +155,7 @@ class AudioEngine implements AudioEngineApi {
     comp.connect(lim);
     lim.connect(post);
     post.connect(c.destination);
+    this.post = post;
     this.master = master;
     this.sfxBus = c.createGain();
     this.sfxBus.connect(master);
@@ -469,7 +474,7 @@ class AudioEngine implements AudioEngineApi {
     try {
       const c = this.ctx;
       const b = this.chirps[f];
-      if (!c || !b || !this.voiceBus || c.state !== 'running') return;
+      if (!c || !b || !this.voiceBus || c.state === 'closed') return;
       const s = c.createBufferSource();
       s.buffer = b;
       const g = c.createGain();
@@ -548,7 +553,7 @@ class AudioEngine implements AudioEngineApi {
     const taper = (x: number) => x * x;
     set(this.master, taper(this.vols.master) * 1.2);
     set(this.sfxBus, taper(this.vols.sfx) * 1.25);
-    set(this.musicBus, taper(this.vols.music) * 1.6);
+    set(this.musicBus, taper(this.vols.music) * 2.0);
     set(this.voiceBus, taper(this.vols.voice));
   }
 
@@ -568,6 +573,17 @@ class AudioEngine implements AudioEngineApi {
       voices: this.voice.describe(),
       speaking: this.voice.speaking,
     };
+  }
+
+  /** Analyser on the final output (created on demand) for meters / tests. */
+  tap(): AnalyserNode | null {
+    if (!this.ctx || !this.post) return null;
+    if (!this.analyser) {
+      this.analyser = this.ctx.createAnalyser();
+      this.analyser.fftSize = 2048;
+      this.post.connect(this.analyser);
+    }
+    return this.analyser;
   }
 
   get musicEngine(): MusicEngine | null {
@@ -626,6 +642,19 @@ export const audioDebug = {
   },
   get ctx(): AudioContext | null {
     return instance.context;
+  },
+  /** Output level meter: returns [rmsDb, peakDb] of the last ~46 ms. */
+  level(): [number, number] {
+    const a = instance.tap();
+    if (!a) return [-120, -120];
+    const d = new Float32Array(a.fftSize);
+    a.getFloatTimeDomainData(d);
+    let q = 0, p = 0;
+    for (const v of d) {
+      q += v * v;
+      p = Math.max(p, Math.abs(v));
+    }
+    return [10 * Math.log10(q / d.length + 1e-12), 20 * Math.log10(p + 1e-9)];
   },
   get voiceHistory() {
     return instance.voice?.history ?? [];

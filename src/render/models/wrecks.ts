@@ -44,9 +44,8 @@ export function makeHusk(live: Template, seed: number): Template {
   const b = new B({ aoHeight: 0 });
   const box = new THREE.Box3().setFromObject(live.root);
   const rad = Math.max(0.25, Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 0.6);
-  b.cyl('charred', 0x100d0b, rad, rad * 1.05, 0.006, 14, 0, 0.004, 0);
   for (let i = 0; i < 5; i++) {
-    b.add(cboxGeo(0.04 + r() * 0.05, 0.02 + r() * 0.02, 0.04 + r() * 0.04, 0.008), 'charred', 0x2a2522, T((r() - 0.5) * rad * 1.6, 0.012, (r() - 0.5) * rad * 1.6, r(), r() * 3, r()));
+    b.add(cboxGeo(0.04 + r() * 0.05, 0.02 + r() * 0.02, 0.04 + r() * 0.04, 0.008), 'charred', 0x6a5e54, T((r() - 0.5) * rad * 1.6, 0.012, (r() - 0.5) * rad * 1.6, r(), r() * 3, r()));
   }
   root.add(b.meshes());
   return finalizeTemplate(root, [], undefined, live.height * 0.9);
@@ -58,15 +57,15 @@ export function makeRubble(fp: [number, number]): Template {
   const r = rng(w * 131 + d * 17);
   const root = new THREE.Group();
   const b = new B({ aoHeight: 0.2, aoMin: 0.5, jitter: 0.08, seed: w * 7 + d });
-  b.cboxB('charred', 0x2c2724, w * 0.94, 0.03, d * 0.94, 0.012, 0, 0, 0);
+  b.cboxB('matte', 0x4a443e, w * 0.9, 0.03, d * 0.9, 0.012, 0, 0, 0);
   const area = w * d;
-  const chunks = Math.round(18 * area);
+  const chunks = Math.round(11 * area);
   for (let i = 0; i < chunks; i++) {
     const x = (r() - 0.5) * w * 0.85, z = (r() - 0.5) * d * 0.85;
     const centre = 1 - Math.min(1, Math.hypot(x / (w * 0.5), z / (d * 0.5)));
-    const s = 0.06 + r() * 0.14 + centre * 0.08;
-    const col = r() < 0.3 ? 0x3a3430 : r() < 0.6 ? 0x6f6b64 : 0x86827a;
-    b.add(cboxGeo(s * (1 + r()), s * (0.5 + r() * 0.6), s * (1 + r()), s * 0.15), r() < 0.3 ? 'charred' : 'matte', col, T(x, 0.03 + s * 0.2 + centre * 0.08, z, r() - 0.5, r() * 3, r() - 0.5));
+    const s = 0.05 + r() * 0.1 + centre * 0.07;
+    const col = r() < 0.25 ? 0x57504a : r() < 0.6 ? 0x6a665f : 0x76726a;
+    b.add(cboxGeo(s * (1 + r()), s * (0.5 + r() * 0.6), s * (1 + r()), s * 0.15), r() < 0.15 ? 'charred' : 'matte', col, T(x, 0.03 + s * 0.2 + centre * 0.08, z, r() - 0.5, r() * 3, r() - 0.5));
   }
   // broken wall stubs at corners
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1]]) {
