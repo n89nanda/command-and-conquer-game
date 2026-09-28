@@ -72,6 +72,8 @@ export class World {
   onTick: ((dt: number) => void) | null = null;
   /** Called when entity is destroyed (for scripts). */
   gameOver = false;
+  /** Why the game ended (shown on the end screen). */
+  endReason = '';
 
   constructor(map: GameMap, players: Player[], opts: WorldOptions = {}) {
     this.map = map;

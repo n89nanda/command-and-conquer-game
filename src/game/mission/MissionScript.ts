@@ -204,7 +204,10 @@ export abstract class MissionScript {
   defeat(reason?: string, delay = 2) {
     if (this.finished) return;
     this.finished = true;
-    if (reason) this.host.message(reason, '#ff4a3a');
+    if (reason) {
+      this.host.message(reason, '#ff4a3a');
+      this.world.endReason = reason;
+    }
     setTimeoutGame(this, delay, () => this.host.end(false));
   }
   timer(label: string, seconds: number | null) {

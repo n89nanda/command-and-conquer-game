@@ -117,6 +117,18 @@ export class Game {
   missionScript: { update(dt: number): void } | null = null;
   cinematic = false;
   alwaysRadar = false;
+  private noBaseSince = new Map<Player, number>();
+  private revealedStragglers = new Set<Player>();
+  /** Two-finger scroll pans (trackpad) instead of zooming (mouse wheel). */
+  trackpadMode = (() => {
+    try {
+      const v = localStorage.getItem('riftfall.trackpad');
+      if (v !== null) return v === '1';
+    } catch {
+      /* ignore */
+    }
+    return navigator.platform.toUpperCase().includes('MAC');
+  })();
   beacons: import('./mission/MissionScript').Beacon[] = [];
   private listeners: [EventTarget, string, EventListener, AddEventListenerOptions?][] = [];
 
@@ -210,6 +222,11 @@ export class Game {
       if (this.missionTimer && this.missionTimer.seconds > 0) this.missionTimer.seconds = Math.max(0, this.missionTimer.seconds - dt * this.speed);
     }
     this.updateCamera(dt);
+    // campaign operations that don't allow a radar structure give the player the minimap for free
+    if (this.missionScript && !this.alwaysRadar && this.world.tickCount % 30 === 0) {
+      const radarId = Object.values(BUILDINGS).find((b) => b.radar && b.faction === this.me.faction)?.id;
+      if (radarId && !this.me.isVisibleItem(radarId)) this.alwaysRadar = true;
+    }
     this.selection = this.selection.filter((e) => !e.dead && (e.owner === this.me || this.world.visibleTo(e, this.me)));
     this.updateHover();
     this.updateGhost();
@@ -231,12 +248,35 @@ export class Game {
     const alive = (p: Player) => this.world.buildings.some((b) => b.owner === p && !b.def.wall && b.def.faction !== 'both') || this.world.units.some((u) => u.owner === p && !u.def.harvester);
     for (const p of this.world.players) {
       if (p.isNeutral || p.defeated) continue;
+      // a player without any base structure is finished after a short grace period;
+      // their stragglers are revealed so the hunt doesn't drag on
+      const hasBase = this.world.buildings.some((b) => b.owner === p && !b.def.wall && b.def.faction !== 'both');
+      const hasMcv = this.world.units.some((u) => u.owner === p && u.def.mcv);
+      if (!hasBase && !hasMcv) {
+        this.noBaseSince.set(p, this.noBaseSince.get(p) ?? this.world.time);
+        const since = this.world.time - this.noBaseSince.get(p)!;
+        if (p !== this.me && p.isEnemyOf(this.me)) {
+          const left = this.world.units.filter((u) => u.owner === p && !u.def.harvester);
+          if (left.length && !this.revealedStragglers.has(p)) {
+            this.revealedStragglers.add(p);
+            this.announce(`${left.length} enemy unit${left.length > 1 ? 's' : ''} remaining.`, true, '#ffd76a');
+          }
+          this.beacons = this.beacons.filter((b) => !b.id.startsWith('straggler:' + p.index));
+          left.slice(0, 6).forEach((u, i) => this.beacons.push({ id: `straggler:${p.index}:${i}`, x: u.x, z: u.z, entity: u, color: '#ff6a4a' }));
+        }
+        if (since > 60 && p !== this.me) {
+          for (const u of this.world.units) if (u.owner === p) this.world.kill(u, null);
+        }
+      } else this.noBaseSince.delete(p);
       if (!alive(p)) {
         p.defeated = true;
         if (p !== this.me) this.announce(`${p.name} has been defeated.`, true);
       }
     }
-    if (this.me.defeated) return this.end(false);
+    if (this.me.defeated) {
+      this.world.endReason = 'Your forces were wiped out.';
+      return this.end(false);
+    }
     const enemiesLeft = this.world.players.some((p) => !p.isNeutral && !p.defeated && p.isEnemyOf(this.me));
     if (!enemiesLeft) this.end(true);
   }
@@ -267,7 +307,7 @@ export class Game {
     audio.speak(text, kind, { faction, priority: speaker === 'announcer' ? 2 : 3 });
   }
   hint(html: string | null) {
-    this.hooks.onHint?.(html);
+    this.hooks.onHint?.(html ? platformText(html, this.trackpadMode) : html);
   }
   playMusic(track: import('../audio/AudioTypes').MusicTrack) {
     audio.playMusic(track);
@@ -386,7 +426,7 @@ export class Game {
     if (this.keys.has('ArrowUp')) dz -= 1;
     if (this.keys.has('ArrowDown')) dz += 1;
     if (this.edgeScroll && this.mouseIn && !this.dragging && !this.midDrag && document.hasFocus()) {
-      const e = 6;
+      const e = 12;
       const W = window.innerWidth, H = window.innerHeight;
       if (this.mouseX <= e) dx -= 1;
       if (this.mouseX >= W - e - 1) dx += 1;
@@ -472,11 +512,17 @@ export class Game {
         e.preventDefault();
         const rig = this.renderer.rig;
         const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-        if (e.ctrlKey) rig.zoom *= 1 + d * 0.01; // pinch
-        else if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.2 && e.deltaMode === 0) {
-          // two-finger horizontal swipe pans
-          rig.targetX += e.deltaX * rig.zoom * 0.0025;
-        } else rig.zoom *= 1 + Math.sign(d) * Math.min(0.15, Math.abs(d) * 0.0015);
+        if (e.ctrlKey) {
+          // pinch-to-zoom (trackpad) / ctrl+wheel
+          rig.zoom *= 1 + Math.max(-0.2, Math.min(0.2, d * 0.01));
+        } else if (this.trackpadMode && e.deltaMode === 0) {
+          // two-finger scroll pans the map in both axes
+          const k = rig.zoom * 0.0022 * this.scrollSpeed;
+          rig.targetX += e.deltaX * k;
+          rig.targetZ += e.deltaY * k * 1.2;
+        } else {
+          rig.zoom *= 1 + Math.sign(d) * Math.min(0.12, Math.abs(d) * 0.0012);
+        }
         rig.clamp();
       },
       { passive: false },
@@ -513,7 +559,6 @@ export class Game {
     }
     if (e.key === 'Escape') {
       if (this.mode !== 'normal') this.setMode('normal');
-      else if (this.selection.length) this.select([]);
       else this.setPaused(!this.paused);
       return;
     }
@@ -1173,7 +1218,7 @@ export class Game {
         }
         if (b.def.id === 'n_derrick' && b.owner.isNeutral && selected) {
           ctx.fillStyle = '#ffd76a';
-          ctx.font = '600 11px var(--ui-font)';
+          ctx.font = '600 12px ' + UI_FONT;
           ctx.textAlign = 'center';
           ctx.fillText('CAPTURE WITH ENGINEER', (minX + maxX) / 2, maxY + 14);
         }
@@ -1198,7 +1243,7 @@ export class Game {
         for (const [n, ids] of this.groups) {
           if (ids.includes(u.id)) {
             ctx.fillStyle = '#ffffff';
-            ctx.font = '700 10px var(--ui-font)';
+            ctx.font = '700 10px ' + UI_FONT;
             ctx.textAlign = 'left';
             ctx.fillText(String(n), x - bw / 2 - 9, y + 4);
             break;
@@ -1251,7 +1296,42 @@ export class Game {
       }
       const gy = w.map.heightAt(b.x, b.z);
       this.renderer.project(b.x, gy + 1.6, b.z, this.scr);
-      if (!this.scr.vis) continue;
+      const off = !this.scr.vis || this.scr.x < 20 || this.scr.y < 40 || this.scr.x > W - 20 || this.scr.y > H - 20;
+      if (off) {
+        // edge arrow pointing at the off-screen objective
+        const rig = this.renderer.rig;
+        const ang = Math.atan2(b.z - rig.targetZ, b.x - rig.targetX);
+        const cx = W / 2, cy = H / 2;
+        const dx = Math.cos(ang), dy = Math.sin(ang);
+        const t = Math.min((W / 2 - 34) / Math.max(0.001, Math.abs(dx)), (H / 2 - 44) / Math.max(0.001, Math.abs(dy)));
+        const ax = cx + dx * t, ay = cy + dy * t;
+        const col = b.color ?? '#ffd24a';
+        ctx.save();
+        ctx.translate(ax, ay);
+        ctx.rotate(ang);
+        ctx.fillStyle = col;
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 8;
+        ctx.globalAlpha = 0.75 + Math.sin(w.time * 5) * 0.25;
+        ctx.beginPath();
+        ctx.moveTo(14, 0);
+        ctx.lineTo(-6, -9);
+        ctx.lineTo(-2, 0);
+        ctx.lineTo(-6, 9);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        if (b.label) {
+          const dist = Math.round(Math.hypot(b.x - rig.targetX, b.z - rig.targetZ));
+          ctx.font = '700 12px ' + UI_FONT;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#000';
+          ctx.fillText(`${b.label} ${dist}m`, ax - dx * 26 + 1, ay - dy * 22 + 5);
+          ctx.fillStyle = col;
+          ctx.fillText(`${b.label} ${dist}m`, ax - dx * 26, ay - dy * 22 + 4);
+        }
+        continue;
+      }
       const pulse = (w.time * 1.2) % 1;
       const col = b.color ?? '#ffd24a';
       const bx = this.scr.x, by = this.scr.y + Math.sin(w.time * 3) * 3;
@@ -1278,7 +1358,7 @@ export class Game {
       ctx.stroke();
       ctx.globalAlpha = 1;
       if (b.label) {
-        ctx.font = '700 12px var(--ui-font)';
+        ctx.font = '700 12px ' + UI_FONT;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#000';
         ctx.fillText(b.label, bx + 1, by - 17);
@@ -1341,9 +1421,18 @@ export class Game {
     }
     if (!this.me.canBuild(defId)) {
       audio.play('error');
+      const missing = def.prereqs.filter((p) => !this.me.has(p)).map((p) => BUILDINGS[p]?.name ?? p);
+      const building = def.prereqs.some((p) => this.world.buildings.some((b) => b.owner === this.me && b.def.id === p && b.constructing < 1));
+      if (missing.length) this.hooks.onMessage?.(building ? `Waiting for ${missing.join(', ')} to finish construction.` : `Requires: ${missing.join(', ')}.`, '#ff8a6a');
       return;
     }
-    if (isB && (q.ready || (q.items.length && !(q.items[0].defId === defId && q.items[0].onHold)))) {
+    if (isB && q.ready) {
+      audio.play('error');
+      const name = BUILDINGS[q.ready]?.name ?? 'structure';
+      this.hooks.onMessage?.(`Place the ${name} first: click its READY icon, then click the ground.`, '#ff8a6a');
+      return;
+    }
+    if (isB && q.items.length && !(q.items[0].defId === defId && q.items[0].onHold)) {
       audio.play('error');
       this.hooks.onMessage?.('Unable to comply. Building in progress.', '#ff8a6a');
       audio.speak('Unable to comply. Building in progress.', 'announcer', { faction: this.me.faction, priority: 0 });
@@ -1433,7 +1522,7 @@ function drawIcon(ctx: CanvasRenderingContext2D, x: number, y: number, kind: 'wr
   if (kind === 'wrench') {
     ctx.globalAlpha = 0.6 + Math.sin(t * 6) * 0.4;
     ctx.fillStyle = '#ffd24a';
-    ctx.font = '700 13px var(--ui-font)';
+    ctx.font = '700 13px ' + UI_FONT;
     ctx.textAlign = 'center';
     ctx.fillText('🔧', x, y);
     ctx.globalAlpha = 1;
@@ -1459,3 +1548,30 @@ const CURSORS: Record<string, string> = {
   norepair: svgCursor(`<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><circle cx='16' cy='16' r='12' fill='#2a2a2a' stroke='#777' stroke-width='2'/><path d='M10 22 L18 14 M17 10 a4 4 0 1 0 5 5' stroke='#777' stroke-width='3' fill='none'/></svg>`, 16, 16, 'not-allowed'),
   place: 'crosshair',
 };
+
+/** Canvas can't use CSS variables: resolve the UI font family once. */
+const UI_FONT = (() => {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--ui-font').trim();
+    return v || 'sans-serif';
+  } catch {
+    return 'sans-serif';
+  }
+})();
+
+const IS_MAC = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC');
+/** Rewrites mouse/PC wording in tips for Mac trackpad players. */
+export function platformText(html: string, trackpad: boolean): string {
+  let t = html;
+  if (IS_MAC) {
+    t = t.replace(/<kbd>Ctrl<\/kbd>/g, '<kbd>⌘</kbd>').replace(/\bCtrl\+/g, '⌘+').replace(/<kbd>Alt<\/kbd>/g, '<kbd>⌥ Option</kbd>');
+  }
+  if (trackpad) {
+    t = t
+      .replace(/<b>Right-click<\/b>/g, '<b>Right-click</b> (two-finger tap)')
+      .replace(/screen edges or middle-mouse drag; zoom with the wheel/g, 'screen edges or a two-finger swipe; pinch to zoom')
+      .replace(/middle-mouse drag/g, 'two-finger swipe')
+      .replace(/zoom with the wheel/g, 'pinch to zoom');
+  }
+  return t;
+}

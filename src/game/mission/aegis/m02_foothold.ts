@@ -39,6 +39,8 @@ class Foothold extends CampaignScript {
   }
 
   start() {
+    this.host.alwaysRadar = true; // radar isn't buildable yet in this operation
+
     const { me, cov, raiders } = this.r;
     this.allowOnly(['a_power', 'a_refinery', 'a_barracks', 'a_factory', 'a_tower', 'a_wall', 'a_turret', 'rifleman', 'rocketeer', 'a_engineer', 'scout', 'guardian', 'a_harvester'], 1);
     this.objective('base', 'Deploy the MCV and build a Fusion Reactor and a Riftite Refinery.');
