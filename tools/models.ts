@@ -350,6 +350,23 @@ sun.shadow.camera.bottom = -shadowR;
 sun.shadow.camera.far = shadowR * 5;
 sun.shadow.camera.updateProjectionMatrix();
 
+if (q.get('muzzles') === '1') {
+  const g = new THREE.SphereGeometry(0.03, 8, 6);
+  const m = new THREE.MeshBasicMaterial({ color: 0xff00ff, depthTest: false });
+  for (const e of instances) {
+    const parent = e.inst.turret ?? e.inst.root;
+    for (const v of e.inst.muzzles) {
+      const s = new THREE.Mesh(g, m);
+      s.position.copy(v);
+      s.renderOrder = 10;
+      parent.add(s);
+    }
+    const hb = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.02), new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false }));
+    hb.position.y = e.inst.height;
+    hb.renderOrder = 10;
+    e.inst.root.add(hb);
+  }
+}
 let tris = 0, meshes = 0;
 scene.traverse((o) => {
   const m = o as THREE.Mesh;

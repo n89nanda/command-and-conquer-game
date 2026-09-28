@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import {
   B, P, Template, TrackOpts, finalizeTemplate, node, tracks, treadNode, wheel, vehicleAnim, ventTop,
-  hazardStripZ, strut, byName, antenna, rng,
+  hazardStripZ, strut, byName, antenna, rng, seam,
 } from './kit';
 
 function shell(): { root: THREE.Group; body: THREE.Group } {
@@ -36,6 +36,12 @@ function guardian(team: THREE.Color): Template {
   // team stripes on the rear deck fenders (seen from above)
   b.box('paint', team, 0.3, 0.012, 0.06, -0.28, 0.301, 0.27);
   b.box('paint', team, 0.3, 0.012, 0.06, -0.28, 0.301, -0.27);
+  // panel seams on the deck
+  seam(b, -0.2, -0.33, -0.2, 0.33, 0.295);
+  seam(b, 0.08, -0.33, 0.08, -0.2, 0.295);
+  seam(b, 0.08, 0.2, 0.08, 0.33, 0.295);
+  seam(b, -0.44, 0.2, 0.25, 0.2, 0.295);
+  seam(b, -0.44, -0.2, 0.25, -0.2, 0.295);
   // engine deck grille and exhausts
   ventTop(b, -0.34, 0.295, 0, 0.18, 0.3, 6, P.aSandDk);
   b.box('paint', P.dark, 0.03, 0.05, 0.08, -0.49, 0.235, 0.2);
@@ -252,6 +258,10 @@ function titan(team: THREE.Color): Template {
   b.boxB('paint', P.aSandDk, 1.2, 0.2, 0.46, 0, 0.06, 0);
   b.prism('paint', P.aSand, [[-0.66, 0.24], [0.52, 0.24], [0.7, 0.3], [0.5, 0.42], [-0.62, 0.42], [-0.68, 0.36]], 0.5);
   ventTop(b, -0.48, 0.42, 0, 0.22, 0.36, 7, P.aSandDk);
+  seam(b, -0.3, -0.25, -0.3, 0.25, 0.42);
+  seam(b, 0.3, -0.25, 0.3, 0.25, 0.42);
+  seam(b, -0.6, 0.18, 0.4, 0.18, 0.42);
+  seam(b, -0.6, -0.18, 0.4, -0.18, 0.42);
   b.box('paint', P.dark, 0.04, 0.08, 0.1, -0.68, 0.34, 0.16);
   b.box('paint', P.dark, 0.04, 0.08, 0.1, -0.68, 0.34, -0.16);
   b.box('paint', P.aGold, 0.012, 0.012, 0.36, 0.62, 0.34, 0, 0, 0, -0.54);

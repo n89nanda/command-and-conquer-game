@@ -26,9 +26,9 @@ export type V2 = [number, number];
 // ============================================================================
 export const P = {
   // Aegis Coalition — military-industrial
-  aSand: 0x978c62,
-  aSandLt: 0xb1a77d,
-  aSandDk: 0x5f5a42,
+  aSand: 0x8e855e,
+  aSandLt: 0xa89e76,
+  aSandDk: 0x57523d,
   aOlive: 0x5b6043,
   aSteel: 0x6b737a,
   aSteelLt: 0x8a9298,
@@ -541,6 +541,12 @@ export function ventTop(b: B, x: number, y: number, z: number, w: number, d: num
   for (let i = 0; i < n; i++) b.box('paint', slat, s * 0.55, 0.012, d * 0.82, x - w * 0.43 + s * (i + 0.5), y + 0.016, z);
 }
 
+/** Thin dark panel seam between two XZ points lying on a surface at height y. */
+export function seam(b: B, x0: number, z0: number, x1: number, z1: number, y: number, col: Col = 0x2a2a26, w = 0.012): void {
+  const len = Math.hypot(x1 - x0, z1 - z0);
+  b.box('paint', col, len, 0.006, w, (x0 + x1) / 2, y + 0.002, (z0 + z1) / 2, 0, -Math.atan2(z1 - z0, x1 - x0), 0);
+}
+
 /** Row of windows on the +Z/-Z face (normal along z sign). */
 export function windowsZ(b: B, x0: number, x1: number, y: number, z: number, n: number, ww: number, wh: number, key = 'e:win', sign = 1): void {
   const step = (x1 - x0) / n;
@@ -714,4 +720,41 @@ export function spike(b: B, m: string, col: Col, x: number, y: number, z: number
   g.translate(0, h / 2, 0);
   g.rotateY(ry);
   b.add(g, m, col, T(x, y, z, rx, 0, rz));
+}
+
+// ============================================================================
+// Per-instance transparency (stealth, placement ghosts) without breaking sharing
+// ============================================================================
+const ghostCache = new Map<string, THREE.Material>();
+/**
+ * Fade a model instance. Swaps each mesh to a cached transparent variant of its
+ * shared material (opacity bucketed to 1/20 steps); opacity >= 1 restores the originals.
+ */
+export function setOpacity(root: THREE.Object3D, opacity: number): void {
+  const step = Math.round(Math.max(0, Math.min(1, opacity)) * 20);
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const ud = mesh.userData;
+    if (!ud.baseMat) ud.baseMat = mesh.material;
+    const base = ud.baseMat as THREE.Material;
+    if (step >= 20) {
+      mesh.material = base;
+      mesh.castShadow = ud.baseCast ?? mesh.castShadow;
+      return;
+    }
+    if (ud.baseCast === undefined) ud.baseCast = mesh.castShadow;
+    const key = `${base.uuid}|${step}`;
+    let g = ghostCache.get(key);
+    if (!g) {
+      g = base.clone();
+      g.transparent = true;
+      g.opacity = step / 20;
+      g.depthWrite = step > 14;
+      registerWorldMaterial(g);
+      ghostCache.set(key, g);
+    }
+    mesh.material = g;
+    mesh.castShadow = step > 10 && ud.baseCast;
+  });
 }

@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import type { ModelInstance, ModelLibrary } from './ModelTypes';
 import { B, P, Template, finalizeTemplate, instantiate, hashStr } from './kit';
+export { setOpacity } from './kit';
 import { INFANTRY } from './infantry';
 import { AEGIS_UNITS } from './aegis';
 import { COVENANT_UNITS } from './covenant';
@@ -65,8 +66,35 @@ function getTemplate(kind: 'u' | 'b', id: string, team: THREE.Color): Template {
     console.error(`[models] failed to build ${kind}:${id}`, err);
     t = kind === 'u' ? fallbackUnit(team) : fallbackBuilding(team);
   }
+  if (kind === 'b') t = wrapBuilding(t);
   templates.set(key, t);
   return t;
+}
+
+/** Wrap building content so construction progress (s.build) can raise it out of the ground. */
+function wrapBuilding(t: Template): Template {
+  const content = new THREE.Group();
+  content.name = 'content';
+  for (const c of [...t.root.children]) content.add(c);
+  t.root.add(content);
+  const inner = t.anim;
+  return {
+    ...t,
+    anim: (root) => {
+      const upd = inner?.(root);
+      const ct = root.getObjectByName('content');
+      let last = 1;
+      return (dt, s) => {
+        const b = s.build ?? 1;
+        if (ct && b !== last) {
+          const e = 1 - Math.pow(1 - Math.min(1, Math.max(0, b)), 2);
+          ct.scale.y = 0.04 + 0.96 * e;
+          last = b;
+        }
+        upd?.(dt, s);
+      };
+    },
+  };
 }
 
 export const models: ModelLibrary = {

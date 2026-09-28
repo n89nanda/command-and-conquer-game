@@ -13,6 +13,7 @@ import { EntityViews } from './EntityViews';
 import { FogOfWar } from './FogOfWar';
 import type { ModelInstance, ModelLibrary } from './models/ModelTypes';
 import { TerrainView, paletteFor } from './Terrain';
+import { tickShared } from '../bridge';
 
 export interface GraphicsSettings {
   quality: 0 | 1 | 2; // low / medium / high
@@ -103,6 +104,7 @@ export class GameRenderer {
   private models: ModelLibrary;
   private doodadProvider: DoodadProvider;
   private extra: { husk?: (id: string) => ModelInstance; rubble?: (fp: [number, number]) => ModelInstance };
+  private sharedT = 0;
   private nukeMissiles: { x: number; z: number; sx: number; sz: number; t: number; dur: number }[] = [];
 
   constructor(container: HTMLElement, models: ModelLibrary, doodads: DoodadProvider, extra: GameRenderer['extra'] = {}) {
@@ -349,6 +351,8 @@ export class GameRenderer {
       }
       this.nukeMissiles = this.nukeMissiles.filter((n) => n.t < n.dur);
     }
+    this.sharedT += dt;
+    tickShared(this.sharedT);
     this.fx.update(dt, rig.camera);
     if (this.composer && this.quality >= 1) this.composer.render(dt);
     else this.renderer.render(this.scene, rig.camera);

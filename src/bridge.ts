@@ -25,6 +25,8 @@ interface ModelsModule {
   doodadParts?: DoodadProvider;
   husk?: (id: string) => ModelInstance;
   rubble?: (fp: [number, number]) => ModelInstance;
+  tickShared?: (time: number) => void;
+  setOpacity?: (root: import('three').Object3D, opacity: number) => void;
 }
 const modelMods = import.meta.glob('./render/models/index.ts', { eager: true }) as Record<string, ModelsModule>;
 const mm: ModelsModule = Object.values(modelMods)[0] ?? {};
@@ -32,3 +34,5 @@ export const models: ModelLibrary = mm.models ?? placeholderModels;
 export const doodadParts: DoodadProvider = (mm.doodadParts as DoodadProvider | undefined) ?? fallbackDoodads;
 export const husk = mm.husk;
 export const rubble = mm.rubble;
+export const tickShared = mm.tickShared ?? (() => {});
+export const setOpacity = mm.setOpacity;

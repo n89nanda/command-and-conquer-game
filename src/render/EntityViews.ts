@@ -6,6 +6,7 @@ import type { Unit } from '../game/Unit';
 import type { World } from '../game/World';
 import type { Effects } from './Effects';
 import { registerWorldMaterial } from './materials';
+import { setOpacity } from '../bridge';
 import type { ModelAnimState, ModelInstance, ModelLibrary } from './models/ModelTypes';
 
 export interface View {
@@ -223,7 +224,10 @@ export class EntityViews {
         const cloaked = !!u.def.stealth && u.isCloaked();
         if (cloaked !== v.stealthApplied) {
           v.stealthApplied = cloaked;
-          setStealth(root, cloaked);
+          if (setOpacity) {
+            setOpacity(root, cloaked ? 0.28 : 1);
+            root.traverse((o) => ((o as THREE.Mesh).isMesh ? (o.castShadow = !cloaked) : 0));
+          } else setStealth(root, cloaked);
         }
         // harvesting sparkle
         if (a.harvesting && Math.random() < dt * 6) this.fx.harvestSparkle(x + Math.cos(hd) * 0.5, y, z + Math.sin(hd) * 0.5, map.oreType[Math.floor(u.z) * map.w + Math.floor(u.x)] === 2);
@@ -251,9 +255,7 @@ export class EntityViews {
         a.harvesting = false;
         const build = b.selling ? Math.max(0, b.sellTimer / 1.2) : b.constructing;
         a.build = build;
-        // build-up animation: rise from the ground
-        const sy = build >= 1 ? 1 : Math.max(0.02, easeOut(build));
-        root.scale.set(1, sy, 1);
+        // build-up animation is performed by the model itself (it rises out of the ground via anim.build)
         if (build < 1 && Math.random() < dt * 10) this.fx.construction(b.x, root.position.y, b.z, b.w, b.h);
         const hr = b.hp / b.maxHp;
         if (hr < 0.5 && build >= 1) {
@@ -335,9 +337,6 @@ function angleLerp(a: number, b: number) {
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
   return d;
-}
-function easeOut(t: number) {
-  return 1 - (1 - t) * (1 - t);
 }
 
 const stealthCache = new WeakMap<THREE.Material, THREE.Material>();

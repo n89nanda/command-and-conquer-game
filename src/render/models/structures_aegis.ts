@@ -337,6 +337,16 @@ const aFactory: F = (team) => {
   // team panels on the front roof slope
   b.box('paint', team, 0.8, 0.012, 0.5, -0.8, Y + H + 0.11, 0.3, 0.22, 0, 0);
   b.box('paint', team, 0.8, 0.012, 0.5, 0.8, Y + H + 0.11, 0.3, 0.22, 0, 0);
+  // corrugated roof ribs
+  for (let i = 0; i < 18; i++) {
+    const x = -1.3 + i * (2.6 / 17);
+    if (Math.abs(Math.abs(x) - 0.8) < 0.42) continue; // leave the team panels clean
+    strut(b, 'paint', P.aSteelDk, [x, Y + H + 0.205, -0.35], [x, Y + H + 0.015, fz + 0.2], 0.018, 0.018);
+  }
+  for (let i = 0; i < 18; i++) {
+    const x = -1.3 + i * (2.6 / 17);
+    strut(b, 'paint', P.aSteelDk, [x, Y + H + 0.205, -0.35], [x, Y + H + 0.015, -1.35], 0.018, 0.018);
+  }
   // skylights + vents + stacks
   for (const x of [-0.8, 0, 0.8]) b.box('e:win', 0, 0.3, 0.012, 0.3, x, Y + H + 0.14, -0.85, -0.28, 0, 0);
   ventTop(b, 0, Y + H + 0.15, 0.2, 0.4, 0.3, 7, P.aSteelDk);
@@ -358,8 +368,11 @@ const aFactory: F = (team) => {
   hazardStripZ(b, fz + 0.22, 1.42, Y + 0.02, -0.66, 0.05, 6);
   hazardStripZ(b, fz + 0.22, 1.42, Y + 0.02, 0.66, 0.05, 6);
   // side annex tanks
-  b.cyl('paint', P.aSteelLt, 0.1, 0.1, 0.5, 10, -1.2, Y + 0.25, 1.1);
-  b.cyl('paint', P.aSteelLt, 0.1, 0.1, 0.5, 10, 1.2, Y + 0.25, 1.1);
+  for (const s of [1, -1]) {
+    b.cboxB('paint', P.aSteelDk, 0.22, 0.14, 0.16, 0.015, s * 1.12, Y, 1.12);
+    b.box('paint', P.hazardY, 0.224, 0.03, 0.164, s * 1.12, Y + 0.1, 1.12);
+    b.cyl('paint', 0x4f5a3a, 0.05, 0.05, 0.13, 8, s * 1.2, Y + 0.065, 0.86);
+  }
   root.add(b.meshes());
 
   // roller door (hangs from the lintel; scales up to open)
