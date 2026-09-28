@@ -579,7 +579,7 @@ export function sandbags(b: B, a: V2, c: V2, rows = 2, y0 = 0): void {
     for (let i = 0; i < n - (r % 2); i++) {
       const t = (i + 0.5 + off) / n;
       const shade = (i * 7 + r * 3) % 5 === 0 ? 0x927e50 : P.sandbag;
-      b.add(cboxGeo(bagL * 0.96, 0.05, 0.075, 0.018), 'matte', shade, T(a[0] + dx * t, y0 + 0.025 + r * 0.046, a[1] + dz * t, 0, ang, 0));
+      b.add(new THREE.BoxGeometry(bagL * 0.94, 0.045, 0.075), 'matte', shade, T(a[0] + dx * t, y0 + 0.025 + r * 0.046, a[1] + dz * t, 0, ang, 0));
     }
   }
 }
@@ -617,24 +617,26 @@ export function tracks(b: B, o: TrackOpts): void {
     const n = o.wheels;
     for (let i = 0; i < n; i++) {
       const wx = x - len / 2 + h * 0.5 + ((len - h) * i) / Math.max(1, n - 1);
-      b.cylZ('metal', wc, r, 0.02, 10, wx, r + 0.012, zc + s * (w / 2 + 0.004));
-      b.cylZ('paint', P.dark, r * 0.45, 0.024, 6, wx, r + 0.012, zc + s * (w / 2 + 0.008));
+      b.cylZ('paint', wc, r, 0.02, 8, wx, r + 0.012, zc + s * (w / 2 + 0.004));
+      b.box('paint', P.dark, r * 0.7, r * 0.7, 0.024, wx, r + 0.012, zc + s * (w / 2 + 0.008), 0, 0, Math.PI / 4);
     }
     // sprocket + idler
-    b.cylZ('metal', wc, h * 0.33, w * 0.7, 10, x + len / 2 - h * 0.3, h * 0.5, zc + s * 0.01);
-    b.cylZ('metal', wc, h * 0.3, w * 0.7, 10, x - len / 2 + h * 0.3, h * 0.5, zc + s * 0.01);
+    b.cylZ('paint', wc, h * 0.33, w * 0.7, 8, x + len / 2 - h * 0.3, h * 0.5, zc + s * 0.01);
+    b.cylZ('paint', wc, h * 0.3, w * 0.7, 8, x - len / 2 + h * 0.3, h * 0.5, zc + s * 0.01);
   }
 }
 
 /** Track-link ridges on the top run (separate node so it can scroll). */
-export function treadNode(o: TrackOpts, spacing = 0.05): THREE.Group {
+export function treadNode(opts: TrackOpts | TrackOpts[], spacing = 0.05): THREE.Group {
   const b = new B({ aoHeight: 0 });
-  const x = o.x ?? 0;
-  const top = o.len - o.h * 0.4 - spacing * 2;
-  const n = Math.floor(top / spacing);
-  for (const s of o.sides ?? [1, -1]) {
-    for (let i = 0; i <= n; i++) {
-      b.box('paint', 0x3b3936, 0.018, 0.014, o.w * 1.04, x - top / 2 + i * spacing, o.h + 0.004, s * o.z);
+  for (const o of Array.isArray(opts) ? opts : [opts]) {
+    const x = o.x ?? 0;
+    const top = o.len - o.h * 0.4 - spacing * 2;
+    const n = Math.floor(top / spacing);
+    for (const s of o.sides ?? [1, -1]) {
+      for (let i = 0; i <= n; i++) {
+        b.box('paint', 0x3b3936, 0.018, 0.014, o.w * 1.04, x - top / 2 + i * spacing, o.h + 0.004, s * o.z);
+      }
     }
   }
   const g = b.meshes();
@@ -647,8 +649,8 @@ export function treadNode(o: TrackOpts, spacing = 0.05): THREE.Group {
 export function wheel(b: B, x: number, y: number, z: number, r: number, w: number, hubCol: Col = P.gunmetal, side = 1): void {
   b.cylZ('paint', P.rubber, r, w, 12, x, y, z);
   b.cylZ('paint', 0x2a2a2a, r * 0.82, w + 0.004, 12, x, y, z);
-  b.cylZ('metal', hubCol, r * 0.5, w + 0.012, 8, x, y, z + side * 0.002);
-  b.cylZ('metal', P.dark, r * 0.18, w + 0.02, 6, x, y, z + side * 0.004);
+  b.cylZ('paint', hubCol, r * 0.5, w + 0.012, 8, x, y, z + side * 0.002);
+  b.cylZ('paint', P.dark, r * 0.18, w + 0.02, 6, x, y, z + side * 0.004);
 }
 
 /** Generic vehicle animator: body bob, tread scroll, barrel recoil, drum spin, extra hook. */

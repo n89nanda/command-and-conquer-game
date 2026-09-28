@@ -108,7 +108,7 @@ export class TerrainView {
           vec4 ore = texture2D(uOreTex, vTerrXZ / uMapSize);
           float amt = smoothstep(0.02, 0.6, ore.r) * (0.75 + d1 * 0.5);
           vec3 tint = mix(vec3(0.10, 0.32, 0.24), vec3(0.24, 0.14, 0.40), ore.g);
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.45 + tint * 0.55, clamp(amt, 0.0, 0.85));
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.5 + tint * 0.4, clamp(amt, 0.0, 0.7));
         }`,
         )
         .replace(
@@ -117,7 +117,7 @@ export class TerrainView {
         {
           vec4 ore2 = texture2D(uOreTex, vTerrXZ / uMapSize);
           float veins = smoothstep(0.62, 0.8, texture2D(bumpMap, vBumpMapUv * 1.7).r);
-          float glow = smoothstep(0.05, 0.7, ore2.r) * (0.05 + veins * 0.5) * (0.8 + 0.2 * sin(uTime * 1.5 + vTerrXZ.x * 0.7));
+          float glow = smoothstep(0.05, 0.7, ore2.r) * (0.012 + veins * 0.16) * (0.8 + 0.2 * sin(uTime * 1.5 + vTerrXZ.x * 0.7));
           totalEmissiveRadiance += mix(vec3(0.1, 0.9, 0.6), vec3(0.5, 0.3, 1.0), ore2.g) * glow;
         }`,
         );

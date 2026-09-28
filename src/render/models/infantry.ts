@@ -72,7 +72,7 @@ function weaponParts(b: B, s: SoldierSpec): V3 | null {
       b.box('paint', P.cBlack, 0.18, 0.034, 0.026, 0.11, 0.085, 0.045);
       b.box('paint', P.cRed, 0.08, 0.012, 0.028, 0.12, 0.105, 0.045);
       b.box('paint', P.cGun, 0.03, 0.05, 0.02, 0.09, 0.05, 0.045);
-      b.box('e:orange', 0, 0.03, 0.01, 0.03, 0.15, 0.07, 0.045);
+      b.box('e:red', 0, 0.03, 0.01, 0.03, 0.15, 0.07, 0.045);
       b.cylX('paint', 0x151515, 0.009, 0.007, 0.07, 5, 0.23, 0.088, 0.045);
       return [0.27, HIP + 0.088, 0.045];
     case 'flame':
@@ -171,24 +171,24 @@ function soldier(s: SoldierSpec, team: THREE.Color): Template {
     case 'radio':
       b.cbox('paint', 0x4d5040, 0.06, 0.1, 0.1, 0.012, -0.08, 0.095, 0);
       b.cyl('paint', 0x111111, 0.003, 0.004, 0.2, 4, -0.09, 0.24, -0.035);
-      b.box('e:green', 0, 0.01, 0.01, 0.01, -0.05, 0.12, 0.03);
+      b.box('paint', 0x3a8a3a, 0.01, 0.01, 0.01, -0.05, 0.12, 0.03);
       break;
     case 'tools':
       b.cbox('paint', 0x5a5a4e, 0.06, 0.085, 0.12, 0.012, -0.08, 0.09, 0);
       b.box('paint', P.hazardY, 0.062, 0.015, 0.122, -0.08, 0.12, 0);
-      b.cyl('metal', P.steel, 0.006, 0.006, 0.12, 5, -0.1, 0.17, 0.04, 0.25);
+      b.cyl('paint', P.steel, 0.006, 0.006, 0.12, 5, -0.1, 0.17, 0.04, 0.25);
       break;
     case 'tanks':
       b.cyl('paint', P.cGun, 0.03, 0.03, 0.13, 8, -0.085, 0.1, 0.035);
       b.cyl('paint', P.cGun, 0.03, 0.03, 0.13, 8, -0.085, 0.1, -0.035);
-      b.cyl('e:orange:pulse', 0, 0.031, 0.031, 0.02, 8, -0.085, 0.1, 0.035);
-      b.cyl('e:orange:pulse', 0, 0.031, 0.031, 0.02, 8, -0.085, 0.1, -0.035);
+      b.cyl('e:orange:flicker', 0, 0.031, 0.031, 0.02, 8, -0.085, 0.1, 0.035);
+      b.cyl('e:orange:flicker', 0, 0.031, 0.031, 0.02, 8, -0.085, 0.1, -0.035);
       b.dome('paint', P.cBlack, 0.03, -0.085, 0.165, 0.035, 0.6, 8, 3);
       b.dome('paint', P.cBlack, 0.03, -0.085, 0.165, -0.035, 0.6, 8, 3);
       break;
     case 'riftTank':
       b.cbox('paint', P.cBlack, 0.05, 0.1, 0.1, 0.02, -0.08, 0.1, 0);
-      b.box('e:teal:pulse', 0, 0.02, 0.06, 0.06, -0.106, 0.1, 0);
+      b.box('e:teal', 0, 0.02, 0.06, 0.06, -0.106, 0.1, 0);
       break;
     case 'cloak':
       b.taper('paint', s.helmetCol, 0.02, 0.16, 0.04, 0.2, 0.15, -0.065, 0.0, 0, 0.0);
@@ -287,7 +287,7 @@ export const INFANTRY: Record<string, (team: THREE.Color) => Template> = {
   marksman: (t) =>
     soldier({ ...aegisBase, armor: 0x3f4640, armorDk: 0x2b302b, cloth: 0x4a5048, helmetCol: 0x39403a, helmet: 'goggles', visor: 'e:blue', weapon: 'sniper', pack: 'cloak' }, t),
   acolyte: (t) => soldier({ ...covBase, helmet: 'hood', helmetCol: 0x2b1718, weapon: 'riftRifle', pack: 'none' }, t),
-  zealot: (t) => soldier({ ...covBase, armor: 0x3a2d2a, helmet: 'mask', weapon: 'flame', pack: 'tanks', bulk: 1.08 }, t),
+  zealot: (t) => soldier({ ...covBase, armor: 0x3a2d2a, helmet: 'mask', visor: 'e:orange:flicker', weapon: 'flame', pack: 'tanks', bulk: 1.08 }, t),
   seeker: (t) => soldier({ ...covBase, helmet: 'crest', weapon: 'riftRocket', pack: 'riftTank' }, t),
   c_engineer: (t) => soldier({ ...covBase, armor: 0x44464d, cloth: 0x2f3036, helmet: 'goggles', helmetCol: 0x2c2e33, visor: 'e:teal', weapon: 'none', pack: 'tools', swingArms: true }, t),
 };

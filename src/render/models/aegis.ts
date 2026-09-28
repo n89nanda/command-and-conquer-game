@@ -42,7 +42,7 @@ function guardian(team: THREE.Color): Template {
   b.box('paint', P.dark, 0.03, 0.05, 0.08, -0.49, 0.235, -0.2);
   // driver hatch + periscopes on glacis
   b.cbox('paint', P.aSandDk, 0.08, 0.02, 0.1, 0.01, 0.3, 0.3, 0.14, 0, 0, -0.43);
-  b.box('glass', 0x111820, 0.02, 0.015, 0.05, 0.34, 0.285, 0.14, 0, 0, -0.43);
+  b.box('paint', 0x1a2a38, 0.02, 0.015, 0.05, 0.34, 0.285, 0.14, 0, 0, -0.43);
   // gold identification chevron on the glacis
   b.box('paint', P.aGold, 0.012, 0.01, 0.22, 0.44, 0.235, 0, 0, 0, -0.43);
   // headlights
@@ -88,7 +88,7 @@ function guardian(team: THREE.Color): Template {
   t.box('paint', P.gunmetal, 0.12, 0.015, 0.015, -0.04, 0.2, 0.085);
   // gunner sight with blue optic
   t.box('paint', P.aSteelDk, 0.06, 0.04, 0.05, 0.02, 0.16, -0.1);
-  t.box('e:blue', 0, 0.006, 0.02, 0.035, 0.052, 0.16, -0.1);
+  t.box('paint', 0x6cc4ff, 0.006, 0.02, 0.035, 0.052, 0.16, -0.1);
   // antennas
   t.cyl('paint', 0x222222, 0.004, 0.006, 0.28, 4, -0.22, 0.28, -0.13);
   t.cyl('paint', 0x222222, 0.004, 0.006, 0.18, 4, -0.22, 0.23, 0.13);
@@ -132,7 +132,7 @@ function scout(team: THREE.Color): Template {
   b.box('paint', team, 0.12, 0.012, 0.05, -0.22, 0.2, 0.2);
   b.box('paint', team, 0.12, 0.012, 0.05, -0.22, 0.2, -0.2);
   // windscreen
-  b.box('glass', 0x14202a, 0.02, 0.05, 0.24, 0.235, 0.21, 0, 0, 0, -0.9);
+  b.box('paint', 0x1a2a38, 0.02, 0.05, 0.24, 0.235, 0.21, 0, 0, 0, -0.9);
   b.box('paint', P.aSandDk, 0.03, 0.012, 0.26, 0.25, 0.23, 0, 0, 0, -0.9);
   // bull bar + headlights
   strut(b, 'paint', P.gunmetal, [0.37, 0.1, -0.14], [0.37, 0.1, 0.14], 0.02);
@@ -182,12 +182,12 @@ function tempest(team: THREE.Color): Template {
   b.boxB('paint', P.aSandDk, 0.92, 0.07, 0.3, -0.02, 0.07, 0); // chassis
   // cab
   b.prism('paint', P.aSand, [[0.22, 0.12], [0.48, 0.12], [0.5, 0.2], [0.44, 0.33], [0.22, 0.34]], 0.44);
-  b.box('glass', 0x14202a, 0.02, 0.07, 0.36, 0.475, 0.27, 0, 0, 0, -0.39);
-  b.box('glass', 0x14202a, 0.14, 0.06, 0.02, 0.33, 0.27, 0.222);
-  b.box('glass', 0x14202a, 0.14, 0.06, 0.02, 0.33, 0.27, -0.222);
+  b.box('paint', 0x1a2a38, 0.02, 0.07, 0.36, 0.475, 0.27, 0, 0, 0, -0.39);
+  b.box('paint', 0x1a2a38, 0.14, 0.06, 0.02, 0.33, 0.27, 0.222);
+  b.box('paint', 0x1a2a38, 0.14, 0.06, 0.02, 0.33, 0.27, -0.222);
   b.box('paint', P.aSandDk, 0.2, 0.02, 0.4, 0.33, 0.345, 0); // roof
   b.box('e:amber:blink', 0, 0.03, 0.02, 0.03, 0.3, 0.365, 0.14);
-  b.box('e:amber:blinkB', 0, 0.03, 0.02, 0.03, 0.3, 0.365, -0.14);
+  b.box('e:amber:blink', 0, 0.03, 0.02, 0.03, 0.3, 0.365, -0.14);
   b.box('e:blue', 0, 0.01, 0.025, 0.04, 0.5, 0.17, 0.17);
   b.box('e:blue', 0, 0.01, 0.025, 0.04, 0.5, 0.17, -0.17);
   b.box('paint', P.gunmetal, 0.03, 0.06, 0.38, 0.51, 0.13, 0); // bumper
@@ -240,7 +240,7 @@ function titan(team: THREE.Color): Template {
   const { root, body } = shell();
   const b = new B({ aoHeight: 0.3 });
   const pods: TrackOpts[] = [];
-  for (const x of [0.38, -0.38]) pods.push({ len: 0.6, w: 0.22, h: 0.26, z: 0.34, x, wheels: 4 });
+  for (const x of [0.38, -0.38]) pods.push({ len: 0.6, w: 0.22, h: 0.26, z: 0.34, x, wheels: 3 });
   for (const p of pods) tracks(b, p);
   // pod armour housings
   for (const x of [0.38, -0.38]) for (const s of [1, -1]) {
@@ -264,7 +264,7 @@ function titan(team: THREE.Color): Template {
   b.cbox('paint', P.aSandDk, 0.1, 0.03, 0.18, 0.008, 0.52, 0.405, 0.13, 0, 0, -0.54);
   b.cbox('paint', P.aSandDk, 0.1, 0.03, 0.18, 0.008, 0.52, 0.405, -0.13, 0, 0, -0.54);
   body.add(b.meshes());
-  for (const p of pods) body.add(treadNode(p));
+  body.add(treadNode(pods));
 
   // turret
   const t = new B({ aoBase: 0.42, aoHeight: 0.2, aoMin: 0.7 });
@@ -277,7 +277,7 @@ function titan(team: THREE.Color): Template {
   t.box('paint', P.aSandDk, 0.1, 0.11, 0.36, -0.34, 0.09, 0); // bustle
   t.cyl('paint', P.aSandDk, 0.06, 0.066, 0.05, 10, -0.08, 0.205, 0.11);
   t.box('paint', P.aSteelDk, 0.07, 0.05, 0.06, 0.02, 0.205, -0.12);
-  t.box('e:blue', 0, 0.006, 0.025, 0.04, 0.058, 0.205, -0.12);
+  t.box('paint', 0x6cc4ff, 0.006, 0.025, 0.04, 0.058, 0.205, -0.12);
   t.cyl('paint', 0x222222, 0.005, 0.007, 0.34, 4, -0.32, 0.36, -0.18);
   // missile pods on the flanks
   for (const s of [1, -1]) {
@@ -285,8 +285,8 @@ function titan(team: THREE.Color): Template {
     t.cbox('paint', P.aSand, 0.3, 0.13, 0.12, 0.015, 0.0, 0.12, s * 0.33);
     t.box('paint', team, 0.18, 0.006, 0.09, -0.02, 0.188, s * 0.33);
     for (const dy of [-0.03, 0.03]) for (const dz of [-0.03, 0.03]) {
-      t.cylX('paint', P.dark, 0.022, 0.022, 0.01, 8, 0.152, 0.12 + dy, s * 0.33 + dz);
-      t.cone('paint', P.aSteelLt, 0.016, 0.03, 6, 0.16, 0.12 + dy, s * 0.33 + dz, 0, 0, -Math.PI / 2);
+      t.cylX('paint', P.dark, 0.022, 0.022, 0.01, 6, 0.152, 0.12 + dy, s * 0.33 + dz);
+      t.cone('paint', P.aSteelLt, 0.016, 0.03, 5, 0.16, 0.12 + dy, s * 0.33 + dz, 0, 0, -Math.PI / 2);
     }
   }
   const turret = node('turret', t, -0.06, 0.42, 0);
@@ -330,11 +330,11 @@ function harvester(team: THREE.Color): Template {
   for (const s of [1, -1]) for (const x of [-0.33, -0.07]) b.box('paint', team, 0.2, 0.14, 0.012, x, 0.36, s * 0.363, s * 0.1, 0, 0);
   // cab
   b.cboxB('paint', P.aSand, 0.28, 0.26, 0.26, 0.03, 0.3, 0.2, -0.2);
-  b.box('glass', 0x14202a, 0.02, 0.09, 0.22, 0.44, 0.38, -0.2);
-  b.box('glass', 0x14202a, 0.2, 0.08, 0.02, 0.3, 0.38, -0.07);
+  b.box('paint', 0x1a2a38, 0.02, 0.09, 0.22, 0.44, 0.38, -0.2);
+  b.box('paint', 0x1a2a38, 0.2, 0.08, 0.02, 0.3, 0.38, -0.07);
   b.box('paint', P.aSandDk, 0.3, 0.02, 0.28, 0.3, 0.47, -0.2);
   b.box('e:amber:blink', 0, 0.035, 0.03, 0.035, 0.34, 0.5, -0.28);
-  b.box('e:amber:blinkB', 0, 0.035, 0.03, 0.035, 0.24, 0.5, -0.12);
+  b.box('e:amber:blink', 0, 0.035, 0.03, 0.035, 0.24, 0.5, -0.12);
   // engine block beside cab
   b.cboxB('paint', P.aSteel, 0.24, 0.2, 0.2, 0.02, 0.3, 0.2, 0.13);
   ventTop(b, 0.3, 0.4, 0.13, 0.18, 0.14, 5, P.aSteelDk);
@@ -346,12 +346,8 @@ function harvester(team: THREE.Color): Template {
   b.box('paint', P.aSteelDk, 0.18, 0.05, 0.05, 0.48, 0.15, -0.3);
   b.box('e:blue', 0, 0.01, 0.02, 0.04, 0.515, 0.25, 0.26);
   b.box('e:blue', 0, 0.01, 0.02, 0.04, 0.515, 0.25, -0.26);
-  body.add(b.meshes());
-  body.add(treadNode(tr));
-
   // ore load: a mound of dark riftite ore studded with glowing crystals
-  const o = new B({ aoHeight: 0 });
-  o.hull('paint', 0x1d3d36, [
+  b.hull('paint', 0x1d3d36, [
     [-0.54, 0.5, -0.33], [0.14, 0.5, -0.33], [-0.54, 0.5, 0.33], [0.14, 0.5, 0.33],
     [-0.4, 0.6, -0.15], [0.0, 0.62, -0.12], [-0.38, 0.61, 0.16], [0.02, 0.6, 0.14], [-0.2, 0.65, 0.0],
   ]);
@@ -359,9 +355,11 @@ function harvester(team: THREE.Color): Template {
   for (let i = 0; i < 16; i++) {
     const x = -0.2 + (rnd() - 0.5) * 0.56, z = (rnd() - 0.5) * 0.52;
     const h = 0.06 + rnd() * 0.07;
-    o.cone(i % 3 ? 'crystal' : 'crystalCore', 0, 0.022 + rnd() * 0.018, h, 5, x, 0.59 - Math.abs(z) * 0.2 + h * 0.3, z, (rnd() - 0.5) * 0.9, 0, (rnd() - 0.5) * 0.9);
+    b.cone('crystal', 0, 0.022 + rnd() * 0.018, h, 5, x, 0.59 - Math.abs(z) * 0.2 + h * 0.3, z, (rnd() - 0.5) * 0.9, 0, (rnd() - 0.5) * 0.9);
   }
-  body.add(o.meshes());
+
+  body.add(b.meshes());
+  body.add(treadNode(tr));
 
   // collection drum
   const d = new B({ aoHeight: 0 });
@@ -399,15 +397,15 @@ function mcv(team: THREE.Color): Template {
   }
   // cab
   b.prism('paint', P.aSand, [[0.4, 0.2], [0.66, 0.2], [0.7, 0.28], [0.64, 0.46], [0.4, 0.48]], 0.52);
-  b.box('glass', 0x14202a, 0.02, 0.1, 0.44, 0.67, 0.39, 0, 0, 0, -0.32);
-  b.box('glass', 0x14202a, 0.16, 0.08, 0.02, 0.52, 0.4, 0.262);
-  b.box('glass', 0x14202a, 0.16, 0.08, 0.02, 0.52, 0.4, -0.262);
+  b.box('paint', 0x1a2a38, 0.02, 0.1, 0.44, 0.67, 0.39, 0, 0, 0, -0.32);
+  b.box('paint', 0x1a2a38, 0.16, 0.08, 0.02, 0.52, 0.4, 0.262);
+  b.box('paint', 0x1a2a38, 0.16, 0.08, 0.02, 0.52, 0.4, -0.262);
   b.box('paint', P.aSandDk, 0.26, 0.025, 0.54, 0.53, 0.49, 0);
   b.box('e:amber:blink', 0, 0.04, 0.03, 0.04, 0.5, 0.515, 0.2);
-  b.box('e:amber:blinkB', 0, 0.04, 0.03, 0.04, 0.5, 0.515, -0.2);
+  b.box('e:amber:blink', 0, 0.04, 0.03, 0.04, 0.5, 0.515, -0.2);
   b.box('paint', P.gunmetal, 0.04, 0.08, 0.5, 0.71, 0.22, 0);
-  b.box('e:blue', 0, 0.01, 0.03, 0.06, 0.73, 0.26, 0.19);
-  b.box('e:blue', 0, 0.01, 0.03, 0.06, 0.73, 0.26, -0.19);
+  b.box('e:win', 0, 0.01, 0.03, 0.06, 0.73, 0.26, 0.19);
+  b.box('e:win', 0, 0.01, 0.03, 0.06, 0.73, 0.26, -0.19);
   // folded construction module
   b.cboxB('paint', P.aSteel, 0.74, 0.3, 0.6, 0.03, -0.2, 0.2, 0);
   b.cboxB('paint', P.aSand, 0.6, 0.12, 0.5, 0.03, -0.24, 0.5, 0);
@@ -434,14 +432,14 @@ function mcv(team: THREE.Color): Template {
   b.cyl('paint', P.aSteelDk, 0.012, 0.015, 0.14, 6, -0.4, 0.69, -0.16);
   // rear hazard panel
   hazardStripZ(b, -0.28, 0.28, 0.2, -0.655, 0.02, 8);
+  antenna(b, -0.58, 0.5, 0.24, 0.3, 0x222222, 'e:red:blink');
   body.add(b.meshes());
 
   const dish = new B({ aoHeight: 0 });
-  dish.cyl('metal', P.aSteelLt, 0.07, 0.02, 0.03, 10, 0, 0.0, 0, 0, 0, 0.5);
+  dish.cyl('paint', P.aSteelLt, 0.07, 0.02, 0.03, 10, 0, 0.0, 0, 0, 0, 0.5);
   dish.cyl('paint', P.gunmetal, 0.006, 0.006, 0.06, 4, 0.02, 0.02, 0, 0, 0, 0.5);
   const dn = node('dish', dish, -0.4, 0.78, -0.16);
   body.add(dn);
-  body.add(nodeAntenna(-0.58, 0.5, 0.24));
 
   return finalizeTemplate(root, [], vehicleAnim({
     bob: 0.004,
@@ -452,12 +450,6 @@ function mcv(team: THREE.Color): Template {
       };
     },
   }));
-}
-
-function nodeAntenna(x: number, y: number, z: number): THREE.Group {
-  const b = new B({ aoHeight: 0 });
-  antenna(b, 0, 0, 0, 0.3, 0x222222, 'e:red:blink');
-  return node('antenna', b, x, y, z);
 }
 
 export const AEGIS_UNITS: Record<string, (team: THREE.Color) => Template> = {

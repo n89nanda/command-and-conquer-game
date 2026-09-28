@@ -224,6 +224,11 @@ export class SkirmishAI {
   private ch: number;
   private lastCellUpdate = -999;
   private mixCache: ArmorMix | null = null;
+  /** ground distance (tiles) from our refinery docks, refreshed periodically */
+  private refDist: Uint16Array | null = null;
+  private refDistT = -999;
+  private refDistKey = '';
+  private bfsQ: Int32Array | null = null;
   private mixTime = -999;
 
   // defence
@@ -676,11 +681,67 @@ export class SkirmishAI {
     return d;
   }
 
+  /** Ground distance from the nearest own refinery dock (65535 = unreachable / no refinery). */
+  private refineryDist(x: number, z: number): number {
+    const m = this.world.map;
+    const refs = this.myBuildings.filter((b) => b.def.refinery && !b.dead);
+    const key = refs.map((b) => b.id).join(',');
+    if (!this.refDist || key !== this.refDistKey || this.now - this.refDistT > 20) {
+      this.refDistKey = key;
+      this.refDistT = this.now;
+      const n = m.w * m.h;
+      const dist = this.refDist ?? new Uint16Array(n);
+      dist.fill(65535);
+      const q = this.bfsQ ?? new Int32Array(n);
+      this.bfsQ = q;
+      let qh = 0, qt = 0;
+      for (const r of refs) {
+        const dp = r.dockPoint();
+        const np = m.nearestPassable(dp.x, dp.z, 3);
+        if (!np) continue;
+        const i = np[1] * m.w + np[0];
+        if (dist[i] === 0) continue;
+        dist[i] = 0;
+        q[qt++] = i;
+      }
+      while (qh < qt) {
+        const i = q[qh++];
+        const cx = i % m.w, cz = (i - cx) / m.w;
+        const d = dist[i] + 1;
+        for (let k = 0; k < 4; k++) {
+          const nx = cx + (k === 0 ? 1 : k === 1 ? -1 : 0), nz = cz + (k === 2 ? 1 : k === 3 ? -1 : 0);
+          if (nx < 0 || nz < 0 || nx >= m.w || nz >= m.h) continue;
+          const j = nz * m.w + nx;
+          if (dist[j] <= d) continue;
+          // ore tiles are passable; buildings are not
+          if (!m.passable(nx, nz)) continue;
+          dist[j] = d;
+          q[qt++] = j;
+        }
+      }
+      this.refDist = dist;
+    }
+    const tx = Math.floor(x), tz = Math.floor(z);
+    if (!m.inBounds(tx, tz)) return 65535;
+    const d = this.refDist[tz * m.w + tx];
+    if (d !== 65535) return d;
+    // blocked tile (e.g. ore under a unit, building edge): look at neighbours
+    let best = 65535;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (m.inBounds(tx + dx, tz + dz)) best = Math.min(best, this.refDist[(tz + dz) * m.w + tx + dx] + 1);
+    return best;
+  }
+
   private bestOreCell(nearX: number, nearZ: number, avoidX?: number, avoidZ?: number): OreCell | null {
     let best: OreCell | null = null;
     let bs = -Infinity;
+    const hasRef = this.myBuildings.some((b) => b.def.refinery);
     for (const c of this.oreCells) {
-      const d = Math.hypot(c.x - nearX, c.z - nearZ);
+      let d = Math.hypot(c.x - nearX, c.z - nearZ);
+      if (hasRef) {
+        const g = this.refineryDist(c.x, c.z);
+        if (g >= 65535) continue; // unreachable
+        d = Math.max(d, g);
+      }
       let s = Math.min(c.ore, 8000) / 1000 - d * 0.35;
       if (avoidX !== undefined && avoidZ !== undefined && Math.hypot(c.x - avoidX, c.z - avoidZ) < 10) s -= 20;
       if (this.dangerAt(c.x, c.z, 10) > 600) s -= 15;
@@ -787,9 +848,7 @@ export class SkirmishAI {
       if (!u.def.harvester || u.harvTile < 0) continue;
       n++;
       const tx = u.harvTile % m.w, tz = Math.floor(u.harvTile / m.w);
-      let d = Infinity;
-      for (const b of this.myBuildings) if (b.def.refinery) d = Math.min(d, Math.hypot(b.x - tx, b.z - tz));
-      if (d > 22) far++;
+      if (this.refineryDist(tx + 0.5, tz + 0.5) > 30) far++;
     }
     return n > 0 && far * 2 >= n;
   }
@@ -1142,12 +1201,19 @@ export class SkirmishAI {
 
   private defenseSpot(def: BuildingDef): { x: number; z: number } {
     const spots: { x: number; z: number; w: number }[] = [];
-    const R = this.baseR + 1.5;
+    const R = Math.min(this.baseR, 14) + 1.5;
     for (const a of [0, -0.55, 0.55, -1.1, 1.1]) {
       const ca = Math.cos(a), sa = Math.sin(a);
       const dx = this.ex * ca - this.ez * sa, dz = this.ex * sa + this.ez * ca;
       spots.push({ x: this.cx + dx * R, z: this.cz + dz * R, w: 1 + Math.abs(a) * 0.4 });
     }
+    // in front of the structures closest to the enemy
+    const front = this.myBuildings
+      .filter((b) => !b.weapons.length && !b.def.wall && b.def.faction !== 'both')
+      .map((b) => ({ b, along: (b.x - this.cx) * this.ex + (b.z - this.cz) * this.ez }))
+      .sort((a, b) => b.along - a.along)
+      .slice(0, 3);
+    for (const f of front) spots.push({ x: f.b.x + this.ex * 3.5, z: f.b.z + this.ez * 3.5, w: 0.9 });
     for (const b of this.myBuildings) {
       if (!b.def.refinery) continue;
       spots.push({ x: b.x + this.ex * 3.5, z: b.z + this.ez * 3.5, w: 1.1 });
@@ -1250,6 +1316,26 @@ export class SkirmishAI {
       for (const u of army) if (unitInfo(u.def).fast) fast++;
       for (const it of this.player.queues.vehicles.items) if (this.kit.unit[it.defId]?.fast) fast++;
       if (fast < 2 && this.now - this.lastHarass > 60) return scout.def.id;
+    }
+    // enemy aircraft around and too little anti-air: build some
+    let enemyAir = 0;
+    for (const sv of this.seen.values()) if (sv.def.flying && !sv.unit.dead && this.now - sv.t < 150) enemyAir++;
+    if (enemyAir > 0) {
+      let aa = 0;
+      for (const u of army) if (u.weapons.some((w) => w.def.targetsAir)) aa++;
+      if (aa < enemyAir * 2 + 1) {
+        let best: UnitInfo | null = null;
+        let bs = -Infinity;
+        for (const ui of this.kit.combatUnits) {
+          if (ui.def.tab !== tab || !ui.antiAir || ui.role === 'aircraft' || !this.canBuild(ui.def.id)) continue;
+          const sc = (ui.dps.aircraft * Math.sqrt(ui.def.hp)) / ui.def.cost;
+          if (sc > bs) {
+            bs = sc;
+            best = ui;
+          }
+        }
+        if (best && this.rand() < 0.7) return best.def.id;
+      }
     }
     const opts: { id: string; s: number }[] = [];
     for (const ui of this.kit.combatUnits) {
@@ -1713,6 +1799,20 @@ export class SkirmishAI {
     let seenUnit: SeenUnit | null = null;
     for (const s of this.seen.values()) if (!s.unit.dead && !s.def.flying && (!seenUnit || s.t > seenUnit.t)) seenUnit = s;
     if (seenUnit && this.now - seenUnit.t < 30) return { entity: null, x: seenUnit.x, z: seenUnit.z };
+    // stalemate breaker: late in the game go straight for whatever the enemy has left
+    if (this.P.cheatBase || this.now > 1500) {
+      let bu: Unit | null = null;
+      let bd = Infinity;
+      for (const u of this.world.units) {
+        if (u.dead || !u.owner.isEnemyOf(this.player)) continue;
+        const d = Math.hypot(u.x - fx, u.z - fz) + (u.isAir ? 30 : 0);
+        if (d < bd) {
+          bd = d;
+          bu = u;
+        }
+      }
+      if (bu) return { entity: bu.isAir ? null : bu, x: bu.x, z: bu.z };
+    }
     return this.huntPoint(fx, fz);
   }
 
@@ -2192,23 +2292,19 @@ export class SkirmishAI {
       if ((u.harvState === 'toOre' || u.harvState === 'seek') && u.harvTile >= 0 && this.difficulty !== 'easy') {
         const m = this.world.map;
         const tx = u.harvTile % m.w, tz = Math.floor(u.harvTile / m.w);
-        let nearRef = Infinity;
-        for (const b of this.myBuildings) if (b.def.refinery) nearRef = Math.min(nearRef, Math.hypot(b.x - tx, b.z - tz));
-        if (nearRef > 20) {
+        const cur = this.refineryDist(tx + 0.5, tz + 0.5);
+        if (cur > 24) {
           let best: OreCell | null = null;
           let bs = Infinity;
           for (const c of this.oreCells) {
             if (c.ore < 2500) continue;
-            for (const b of this.myBuildings) {
-              if (!b.def.refinery) continue;
-              const d = Math.hypot(b.x - c.x, b.z - c.z);
-              if (d < 16 && d < bs && this.dangerAt(c.x, c.z, 9) < 500) {
-                bs = d;
-                best = c;
-              }
+            const d = this.refineryDist(c.x, c.z);
+            if (d < bs && this.dangerAt(c.x, c.z, 9) < 500) {
+              bs = d;
+              best = c;
             }
           }
-          if (best && bs + 4 < nearRef) {
+          if (best && bs + 8 < cur) {
             u.issue({ type: 'harvest', x: best.x, z: best.z }, this.world);
             continue;
           }

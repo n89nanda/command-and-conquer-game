@@ -52,7 +52,7 @@ const aYard: F = (team) => {
   }
   b.cboxB('paint', P.aSteelDk, 0.76, 0.06, 0.76, 0.02, 0.92, Y + 1.28, -0.95);
   antenna(b, 1.12, Y + 1.34, -1.15, 0.4);
-  antenna(b, 0.75, Y + 1.34, -1.12, 0.25, P.gunmetal, 'e:red:blinkB');
+  antenna(b, 0.75, Y + 1.34, -1.12, 0.25, P.gunmetal, 'e:red:blink');
   // walkway tower <-> hall
   b.boxB('paint', P.aSteelDk, 0.36, 0.12, 0.24, 0.47, Y + 0.45, -0.95);
   // construction pad (front)
@@ -65,10 +65,10 @@ const aYard: F = (team) => {
   b.cboxB('paint', P.wood, 0.14, 0.12, 0.14, 0.01, -0.6, Y, 1.15);
   b.cboxB('paint', P.wood, 0.12, 0.1, 0.12, 0.01, -0.42, Y, 1.2);
   // pipes along hall
-  pipe(b, 'metal', P.steel, [-1.37, Y + 0.12, -1.2], [-1.37, Y + 0.12, 0.0], 0.03);
-  pipe(b, 'metal', P.steel, [-1.37, Y + 0.2, -1.2], [-1.37, Y + 0.2, 0.0], 0.03);
+  pipe(b, 'paint', P.steel, [-1.37, Y + 0.12, -1.2], [-1.37, Y + 0.12, 0.0], 0.03);
+  pipe(b, 'paint', P.steel, [-1.37, Y + 0.2, -1.2], [-1.37, Y + 0.2, 0.0], 0.03);
   beacon(b, 0.3, Y + 0.8, -1.3, 'e:amber:blink');
-  beacon(b, -1.3, Y + 0.8, -1.3, 'e:amber:blinkB');
+  beacon(b, -1.3, Y + 0.8, -1.3, 'e:amber:blink');
   // tower crane mast (front right)
   const mx = 1.08, mz = 1.02, mh = 1.72;
   b.boxB('paint', P.aConcreteDk, 0.26, 0.06, 0.26, mx, Y, mz);
@@ -82,7 +82,7 @@ const aYard: F = (team) => {
   // crane 1 jib
   const c = new B({ aoHeight: 0 });
   c.boxB('paint', P.aSandDk, 0.2, 0.12, 0.18, 0, 0, 0); // slewing unit + cab
-  c.box('e:win', 0, 0.02, 0.06, 0.12, 0.1, 0.07, 0);
+  c.box('paint', 0x5da6f0, 0.02, 0.06, 0.12, 0.1, 0.07, 0);
   // jib (towards -X)
   const jl = 1.45;
   strut(c, 'paint', P.hazardY, [0, 0.12, 0.05], [-jl, 0.12, 0.05], 0.022);
@@ -102,7 +102,7 @@ const aYard: F = (team) => {
   strut(c, 'paint', P.gunmetal, [0, 0.42, 0], [-jl * 0.7, 0.16, 0], 0.008);
   strut(c, 'paint', P.gunmetal, [0, 0.42, 0], [0.4, 0.18, 0], 0.008);
   beacon(c, 0, 0.42, 0, 'e:red:blink');
-  beacon(c, -jl, 0.13, 0, 'e:red:blinkB');
+  beacon(c, -jl, 0.13, 0, 'e:red:blink');
   // trolley, cable, hook + suspended beam
   c.box('paint', P.gunmetal, 0.06, 0.03, 0.12, -1.0, 0.1, 0);
   c.cyl('paint', 0x222222, 0.004, 0.004, 0.62, 4, -1.0, -0.22, 0);
@@ -122,7 +122,7 @@ const aYard: F = (team) => {
   strut(c2, 'paint', P.gunmetal, [0, 0.26, 0], [0.8, 0.1, 0], 0.007);
   c2.cyl('paint', 0x222222, 0.004, 0.004, 0.4, 4, 0.7, -0.14, 0);
   c2.box('paint', P.hazardY, 0.035, 0.04, 0.035, 0.7, -0.36, 0);
-  beacon(c2, 0, 0.26, 0, 'e:red:blinkB');
+  beacon(c2, 0, 0.26, 0, 'e:red:blink');
   const crane2 = node('crane2', c2, sx, Y + 0.05 + sh, sz);
   crane2.rotation.y = 0.3;
   root.add(crane2);
@@ -321,7 +321,7 @@ const aFactory: F = (team) => {
     b.box('e:win', 0, 0.4, 0.07, 0.02, s * 1.02, Y + 0.45, fz + 0.205);
     b.box('paint', team, 0.64, 0.12, 0.012, s * 1.02, Y + 0.22, fz + 0.205);
     hazardStripZ(b, fz - 0.02, fz + 0.2, Y + 0.0, s * 0.66, 0.06, 3);
-    beacon(b, s * 0.74, Y + H, fz + 0.14, s > 0 ? 'e:amber:blink' : 'e:amber:blinkB');
+    beacon(b, s * 0.74, Y + H, fz + 0.14, s > 0 ? 'e:amber:blink' : 'e:amber:blink');
   }
   b.cboxB('paint', P.aSandDk, 1.4, 0.18, 0.24, 0.02, 0, Y + H - 0.16, fz + 0.1);
   hazardStripX(b, -0.68, 0.68, Y + H - 0.17, fz + 0.225, 0.02, 10);
@@ -547,7 +547,7 @@ const aTechlab: F = (team) => {
   b.cboxB('paint', P.aSteel, 1.4, 0.05, 0.9, 0.015, -0.5, Y + 0.68, -0.3);
   b.box('paint', team, 1.0, 0.012, 0.3, -0.5, Y + 0.735, -0.3);
   // roof antenna array
-  for (let i = 0; i < 3; i++) antenna(b, -1.05 + i * 0.25, Y + 0.73, -0.62, 0.3 + i * 0.06, P.gunmetal, i % 2 ? 'e:red:blinkB' : 'e:red:blink');
+  for (let i = 0; i < 3; i++) antenna(b, -1.05 + i * 0.25, Y + 0.73, -0.62, 0.3 + i * 0.06, P.gunmetal, i % 2 ? 'e:red:blink' : 'e:red:blink');
   // observatory dome (right)
   b.cyl('paint', P.aSteel, 0.38, 0.4, 0.34, 18, 0.95, Y + 0.17, -0.3);
   b.cyl('paint', team, 0.385, 0.385, 0.05, 18, 0.95, Y + 0.28, -0.3);

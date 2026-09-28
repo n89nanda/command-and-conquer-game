@@ -26,8 +26,8 @@ function hawk(team: THREE.Color): Template {
     [-0.3, 0.07, 0.08], [-0.3, 0.2, 0.07], [-0.52, 0.12, 0.03], [-0.52, 0.16, 0.03],
   ]));
   // canopy
-  b.sphere('glass', 0x1a2a3a, 0.08, 0.26, 0.19, 0, 1.9, 0.6, 0.75, 12, 8);
-  b.box('e:win', 0, 0.04, 0.01, 0.05, 0.3, 0.228, 0);
+  b.sphere('paint', 0x22384c, 0.08, 0.26, 0.19, 0, 1.9, 0.6, 0.75, 12, 8);
+  b.box('paint', 0x6cc4ff, 0.04, 0.01, 0.05, 0.3, 0.228, 0);
   // intakes
   for (const s of [1, -1]) b.cbox('paint', P.aSteelDk, 0.18, 0.08, 0.05, 0.012, 0.08, 0.13, s * 0.1);
   // swept wings
@@ -67,8 +67,8 @@ function hawk(team: THREE.Color): Template {
   // engine exhaust + nav lights
   b.cylX('e:blue:pulse', 0, 0.04, 0.03, 0.02, 10, -0.53, 0.14, 0);
   b.sphere('e:red:blink', 0, 0.014, -0.02, 0.14, -0.35, 1, 1, 1, 6, 4);
-  b.sphere('e:green:blink', 0, 0.014, -0.02, 0.14, 0.35, 1, 1, 1, 6, 4);
-  b.sphere('e:white:blinkB', 0, 0.012, -0.57, 0.33, 0, 1, 1, 1, 6, 4);
+  b.sphere('e:red:blink', 0, 0.014, -0.02, 0.14, 0.35, 1, 1, 1, 6, 4);
+  b.sphere('e:red:blink', 0, 0.012, -0.57, 0.33, 0, 1, 1, 1, 6, 4);
   body.add(b.meshes({ receive: true }));
 
   // fans
@@ -123,7 +123,7 @@ function wraith(team: THREE.Color): Template {
     b.box('paint', team, 0.1, 0.008, 0.14, -0.05, 0.128, s * 0.2);
     b.cylX('paint', P.cBlack, 0.045, 0.035, 0.24, 10, -0.04, 0.1, s * 0.33);
     b.cylX('paint', P.cRed, 0.05, 0.05, 0.02, 10, 0.05, 0.1, s * 0.33);
-    b.cylX('e:orange:pulse', 0, 0.032, 0.032, 0.02, 10, -0.165, 0.1, s * 0.33);
+    b.cylX('e:orange', 0, 0.032, 0.032, 0.02, 10, -0.165, 0.1, s * 0.33);
     spike(b, 'paint', P.cBlack, 0.08, 0.1, s * 0.33, 0.1, 0.03, 0, -Math.PI / 2);
     b.cbox('paint', P.cBlack, 0.12, 0.04, 0.04, 0.01, 0.0, 0.06, s * 0.22); // hardpoint
   }
@@ -133,7 +133,12 @@ function wraith(team: THREE.Color): Template {
   b.box('paint', P.cRed, 0.12, 0.01, 0.02, 0.22, 0.2, 0.055, 0, 0, -0.35);
   b.box('paint', P.cRed, 0.12, 0.01, 0.02, 0.22, 0.2, -0.055, 0, 0, -0.35);
   b.sphere('e:red:blink', 0, 0.012, -0.12, 0.09, 0.3, 1, 1, 1, 6, 4);
-  b.sphere('e:red:blinkB', 0, 0.012, -0.12, 0.09, -0.3, 1, 1, 1, 6, 4);
+  b.sphere('e:red:blink', 0, 0.012, -0.12, 0.09, -0.3, 1, 1, 1, 6, 4);
+  // tail rotor (static at this scale)
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2;
+    b.box('paint', P.cGunLt, 0.012, 0.12, 0.012, -0.64 + Math.sin(a) * 0.05, 0.26 + Math.cos(a) * 0.05, 0.03, 0, 0, -a);
+  }
   body.add(b.meshes());
 
   // main rotor
@@ -145,13 +150,6 @@ function wraith(team: THREE.Color): Template {
     r.box('paint', P.cRed, 0.05, 0.009, 0.042, Math.cos(a) * 0.49, 0.004, -Math.sin(a) * 0.49, 0, a, 0);
   }
   body.add(node('rotor', r, 0, 0.32, 0));
-  // tail rotor
-  const tr = new B({ aoHeight: 0 });
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    tr.box('paint', P.cGunLt, 0.012, 0.12, 0.012, Math.sin(a) * 0.05, Math.cos(a) * 0.05, 0, 0, 0, -a);
-  }
-  body.add(node('tailRotor', tr, -0.64, 0.26, 0.03));
   // rotary chin cannon
   const g = new B({ aoHeight: 0 });
   g.cylX('paint', P.cBlack, 0.03, 0.03, 0.06, 8, 0, 0, 0);
@@ -164,12 +162,10 @@ function wraith(team: THREE.Color): Template {
   const muz = [new THREE.Vector3(0.53, 0.03, 0)];
   return finalizeTemplate(root, muz, (rt) => {
     const rotor = byName(rt, 'rotor');
-    const tail = byName(rt, 'tailRotor');
     const cannon = byName(rt, 'cannon');
     return (dt, s) => {
       const rate = s.moving ? 22 : 12;
       if (rotor) rotor.rotation.y += rate * dt;
-      if (tail) tail.rotation.z += rate * 1.6 * dt;
       if (cannon && s.firing > 0) cannon.rotation.x += dt * 30 * s.firing;
     };
   });

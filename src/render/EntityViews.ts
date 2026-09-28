@@ -26,6 +26,7 @@ interface Husk {
   t: number;
   life: number;
   y0: number;
+  fall?: boolean;
 }
 
 const tmpV = new THREE.Vector3();
@@ -89,6 +90,15 @@ export class EntityViews {
   }
 
   private destroy(v: View, died: boolean) {
+    // fallen infantry: keep the model briefly and let it topple over
+    if (died && v.e.kind === 'unit' && (v.e as Unit).def.category === 'infantry' && v.visible && v.model.root.visible) {
+      if (v.ring) this.group.remove(v.ring);
+      this.views.delete(v.e.id);
+      const r = v.model.root;
+      r.rotation.order = 'YXZ';
+      this.husks.push({ model: v.model, t: 0, life: 5, y0: r.position.y, fall: true });
+      return;
+    }
     this.group.remove(v.model.root);
     v.model.dispose?.();
     if (v.ring) this.group.remove(v.ring);
@@ -268,6 +278,13 @@ export class EntityViews {
     // husks fade and sink
     for (const h of this.husks) {
       h.t += dt;
+      if (h.fall) {
+        const k = Math.min(1, h.t / 0.45);
+        h.model.root.rotation.z = (-Math.PI / 2) * k * k;
+        h.model.root.position.y = h.y0 + 0.06 * k;
+        if (h.t > h.life - 1.5) h.model.root.position.y = h.y0 - (h.t - (h.life - 1.5)) * 0.25;
+        continue;
+      }
       if (h.t > h.life - 4) h.model.root.position.y = h.y0 - (h.t - (h.life - 4)) * 0.15;
       if (h.t < 6 && Math.random() < dt * 4) {
         const p = h.model.root.position;

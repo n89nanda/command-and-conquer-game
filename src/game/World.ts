@@ -862,7 +862,13 @@ export class World {
     if (!fog) return true;
     if (e.kind === 'building') {
       const b = e as Building;
-      return fog.isExplored(b.x, b.z);
+      if (b.seenBy.has(p)) return true;
+      // spotted if any footprint corner/centre is currently visible
+      if (fog.isVisible(b.x, b.z) || fog.isVisible(b.tx + 0.5, b.tz + 0.5) || fog.isVisible(b.tx + b.w - 0.5, b.tz + b.h - 0.5) || fog.isVisible(b.tx + 0.5, b.tz + b.h - 0.5) || fog.isVisible(b.tx + b.w - 0.5, b.tz + 0.5)) {
+        b.seenBy.add(p);
+        return true;
+      }
+      return false;
     }
     if (!fog.isVisible(e.x, e.z)) return false;
     const u = e as Unit;

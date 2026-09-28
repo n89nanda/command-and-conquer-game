@@ -139,6 +139,35 @@ export class MapEditor {
     }
   }
 
+  /** Water course along points with sandy banks. */
+  river(points: Pt[], width = 3) {
+    const hw = width / 2;
+    const touched: [number, number][] = [];
+    for (let k = 0; k < points.length - 1; k++) {
+      const a = points[k], b = points[k + 1];
+      const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) * 3);
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+        const wob = hw + (valueNoise(x * 0.3, z * 0.3, this.seed + 5) - 0.5) * 1.0;
+        const R = Math.ceil(wob + 1.5);
+        for (let dz = -R; dz <= R; dz++)
+          for (let dx = -R; dx <= R; dx++) {
+            const d = Math.hypot(dx, dz);
+            const tx = Math.floor(x + dx), tz = Math.floor(z + dz);
+            if (d <= wob) this.set(tx, tz, Terrain.Water);
+            else if (d <= wob + 1.5) touched.push([tx, tz]);
+          }
+      }
+    }
+    for (const [x, z] of touched) {
+      const t = this.map.terrainAt(x, z);
+      if (t !== Terrain.Water && t !== Terrain.Rock && t !== Terrain.Road && this.inner(x, z)) {
+        this.map.terrain[z * this.map.w + x] = Terrain.Sand;
+      }
+    }
+  }
+
   /** Blob of terrain (lake / plateau). */
   blob(cx: number, cz: number, r: number, t: Terrain) {
     for (let z = Math.floor(cz - r - 2); z <= cz + r + 2; z++)

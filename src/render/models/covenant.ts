@@ -60,8 +60,8 @@ function scorpion(team: THREE.Color): Template {
   b.box('e:red', 0, 0.02, 0.018, 0.1, 0.44, 0.13, 0);
   // rear engine glow vents
   b.box('paint', P.cBlack, 0.03, 0.08, 0.26, -0.405, 0.18, 0);
-  b.box('e:orange:pulse', 0, 0.01, 0.03, 0.08, -0.42, 0.18, 0.07);
-  b.box('e:orange:pulse', 0, 0.01, 0.03, 0.08, -0.42, 0.18, -0.07);
+  b.box('e:red', 0, 0.01, 0.03, 0.08, -0.42, 0.18, 0.07);
+  b.box('e:red', 0, 0.01, 0.03, 0.08, -0.42, 0.18, -0.07);
   // scorpion tail: segmented arc over the rear with glowing sting
   const tail: V3[] = [[-0.32, 0.24, 0.0], [-0.44, 0.34, 0], [-0.46, 0.47, 0], [-0.38, 0.57, 0], [-0.26, 0.6, 0], [-0.16, 0.56, 0]];
   for (let i = 0; i < tail.length - 1; i++) {
@@ -69,7 +69,7 @@ function scorpion(team: THREE.Color): Template {
     b.sphere('paint', P.cRed, 0.028 - i * 0.003, tail[i + 1][0], tail[i + 1][1], 0, 1, 1, 1, 6, 4);
   }
   spike(b, 'paint', P.cRed, -0.16, 0.56, 0, 0.1, 0.022, 0, -2.3);
-  b.sphere('e:red:pulse', 0, 0.022, -0.13, 0.52, 0, 1, 1, 1, 6, 4);
+  b.sphere('e:red', 0, 0.022, -0.13, 0.52, 0, 1, 1, 1, 6, 4);
   body.add(b.meshes());
   body.add(treadNode(tr));
 
@@ -78,7 +78,7 @@ function scorpion(team: THREE.Color): Template {
   t.box('paint', team, 0.1, 0.01, 0.12, -0.05, 0.093, 0);
   t.box('paint', P.cRed, 0.012, 0.012, 0.18, 0.07, 0.09, 0);
   for (const s of [1, -1]) spike(t, 'paint', P.cBlack, -0.12, 0.04, s * 0.12, 0.1, 0.02, s * 1.1, 1.0);
-  t.box('e:teal', 0, 0.02, 0.012, 0.05, 0.13, 0.07, 0.06);
+  t.box('paint', P.cRed, 0.02, 0.012, 0.05, 0.13, 0.07, 0.06);
   const turret = node('turret', t, -0.02, 0.24, 0);
   body.add(turret);
   const g = new B({ aoHeight: 0 });
@@ -154,18 +154,16 @@ function shade(team: THREE.Color): Template {
     b.box('e:teal', 0, 0.36, 0.006, 0.01, -0.06, 0.1, s * 0.312);
     b.box('paint', P.cRed, 0.3, 0.01, 0.012, 0.3, 0.1, s * 0.17, 0, s * 0.62, 0);
   }
-  b.box('e:teal:pulse', 0, 0.1, 0.008, 0.03, 0.2, 0.18, 0, 0, 0, -0.3);
+  b.box('e:teal', 0, 0.1, 0.008, 0.03, 0.2, 0.18, 0, 0, 0, -0.3);
+  // rocket pods (raised on struts)
+  for (const s of [1, -1]) {
+    strut(b, 'paint', P.cBlack, [-0.18, 0.2, s * 0.14], [-0.14, 0.26, s * 0.15], 0.03);
+    b.cbox('paint', P.cBlack, 0.24, 0.07, 0.09, 0.015, -0.1, 0.28, s * 0.15);
+    b.box('paint', P.cRed, 0.02, 0.072, 0.092, 0.0, 0.28, s * 0.15);
+    for (const dz of [-0.022, 0.022]) b.cylX('e:red', 0, 0.014, 0.014, 0.01, 6, 0.022, 0.28, s * 0.15 + dz);
+  }
   body.add(b.meshes());
   body.add(treadNode(tr));
-  // rocket pods (raised on struts)
-  const r = new B({ aoBase: 0.2, aoHeight: 0.1, aoMin: 0.7 });
-  for (const s of [1, -1]) {
-    strut(r, 'paint', P.cBlack, [-0.18, 0, s * 0.14], [-0.14, 0.06, s * 0.15], 0.03);
-    r.cbox('paint', P.cBlack, 0.24, 0.07, 0.09, 0.015, -0.1, 0.08, s * 0.15);
-    r.box('paint', P.cRed, 0.02, 0.072, 0.092, 0.0, 0.08, s * 0.15);
-    for (const dz of [-0.022, 0.022]) r.cylX('e:orange', 0, 0.014, 0.014, 0.01, 6, 0.022, 0.08, s * 0.15 + dz);
-  }
-  body.add(node('pods', r, 0, 0.2, 0));
   const muz = [new THREE.Vector3(0.04, 0.28, 0.15), new THREE.Vector3(0.04, 0.28, -0.15)];
   return finalizeTemplate(root, muz, vehicleAnim({ bob: 0.004 }));
 }
@@ -188,9 +186,9 @@ function prism(team: THREE.Color): Template {
     spike(b, 'paint', P.cBlack, -0.44, 0.2, s * 0.36, 0.14, 0.03, 0, s * -1.2);
   }
   // energy conduits on the rear deck
-  for (const s of [1, -1]) b.cylX('e:teal:pulse', 0, 0.02, 0.02, 0.26, 8, -0.32, 0.33, s * 0.12);
+  for (const s of [1, -1]) b.cylX('e:teal', 0, 0.02, 0.02, 0.26, 8, -0.32, 0.33, s * 0.12);
   b.box('paint', P.cBlack, 0.3, 0.04, 0.3, -0.32, 0.31, 0);
-  b.box('e:red', 0, 0.02, 0.02, 0.12, 0.52, 0.18, 0);
+  b.box('paint', P.cRed, 0.02, 0.02, 0.12, 0.52, 0.18, 0);
   body.add(b.meshes());
   body.add(treadNode(tr));
 
@@ -243,7 +241,7 @@ function raider(team: THREE.Color): Template {
     strut(b, 'paint', P.cBlack, [-0.05, 0.2, s * 0.06], [-0.05, 0.2, s * 0.09], 0.02);
   }
   // exhaust glow
-  b.cylX('e:orange:pulse', 0, 0.02, 0.025, 0.02, 6, -0.3, 0.2, 0.0);
+  b.cylX('e:orange', 0, 0.02, 0.025, 0.02, 6, -0.3, 0.2, 0.0);
   // rider (hunched)
   b.cbox('paint', 0x2a2627, 0.12, 0.06, 0.1, 0.02, -0.05, 0.28, 0); // hips/thighs
   b.hull('paint', P.cGunLt, mz([[-0.1, 0.29, 0.06], [0.0, 0.3, 0.07], [0.06, 0.37, 0.05], [-0.06, 0.39, 0.05]])); // torso leaning
@@ -286,7 +284,7 @@ function cHarvester(team: THREE.Color): Template {
   b.hull('paint', P.cGunLt, mz([[0.14, 0.2, 0.2], [0.42, 0.2, 0.16], [0.14, 0.44, 0.14], [0.34, 0.4, 0.1], [0.46, 0.28, 0.1]]));
   b.box('e:red', 0, 0.012, 0.03, 0.16, 0.41, 0.36, 0, 0, 0, -0.9);
   b.box('paint', team, 0.1, 0.01, 0.1, 0.24, 0.44, 0);
-  b.box('e:amber:blink', 0, 0.03, 0.03, 0.03, 0.2, 0.46, 0.08);
+  b.box('paint', P.cRed, 0.03, 0.03, 0.03, 0.2, 0.46, 0.08);
   // scoop claws
   for (const s of [1, -1]) {
     b.hull('paint', P.cBlack, [[0.4, 0.05, s * 0.2], [0.4, 0.26, s * 0.2], [0.4, 0.05, s * 0.36], [0.4, 0.2, s * 0.36], [0.66, 0.03, s * 0.34], [0.62, 0.12, s * 0.36]]);
@@ -345,9 +343,9 @@ function cMcv(team: THREE.Color): Template {
       [-0.46, 0.4, s * 0.245], [0.14, 0.4, s * 0.245], [-0.4, 0.55, s * 0.16], [0.08, 0.55, s * 0.16],
     ]);
   }
-  b.box('e:orange:pulse', 0, 0.62, 0.014, 0.012, -0.15, 0.625, 0.1);
-  b.box('e:orange:pulse', 0, 0.62, 0.014, 0.012, -0.15, 0.625, -0.1);
-  b.sphere('e:teal:pulse', 0, 0.045, -0.16, 0.86, 0, 1, 1.4, 1, 8, 6);
+  b.box('e:orange', 0, 0.62, 0.014, 0.012, -0.15, 0.625, 0.1);
+  b.box('e:orange', 0, 0.62, 0.014, 0.012, -0.15, 0.625, -0.1);
+  b.sphere('e:teal', 0, 0.045, -0.16, 0.86, 0, 1, 1.4, 1, 8, 6);
   // folded claw arm
   strut(b, 'paint', P.cBlack, [-0.64, 0.34, -0.22], [-0.3, 0.68, -0.2], 0.05, 0.05, 0.01);
   strut(b, 'paint', P.cGunLt, [-0.3, 0.68, -0.2], [0.3, 0.52, -0.2], 0.04, 0.04, 0.01);
@@ -355,7 +353,7 @@ function cMcv(team: THREE.Color): Template {
   spike(b, 'paint', P.cRed, 0.3, 0.52, -0.16, 0.08, 0.02, 0.3, -1.6);
   spike(b, 'paint', P.cBlack, -0.62, 0.3, 0.22, 0.2, 0.03, 0.3, 0.5);
   b.box('e:amber:blink', 0, 0.03, 0.03, 0.03, 0.46, 0.51, 0.1);
-  b.box('e:amber:blinkB', 0, 0.03, 0.03, 0.03, 0.46, 0.51, -0.1);
+  b.box('e:amber:blink', 0, 0.03, 0.03, 0.03, 0.46, 0.51, -0.1);
   body.add(b.meshes());
   body.add(treadNode(tr));
   return finalizeTemplate(root, [], vehicleAnim({ bob: 0.004 }));

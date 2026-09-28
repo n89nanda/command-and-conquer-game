@@ -98,7 +98,7 @@ const cYard: F = (team) => {
   chevron(b, 0.8, Y + 0.03, 0.95, 0.4, P.cRed, 1);
   // pylons
   pylon(b, 1.3, -1.3, 0.8);
-  pylon(b, -1.3, 1.3, 0.8, 'e:red:blinkB');
+  pylon(b, -1.3, 1.3, 0.8, 'e:red:blink');
   pylon(b, 1.3, 0.35, 0.6);
   root.add(b.meshes());
   const g = new B({ aoHeight: 0 });
@@ -150,7 +150,7 @@ const cPower: F = (team) => {
   b.box('paint', team, 0.3, 0.05, 0.26, 0.62, Y + 0.22, 0.62);
   for (let i = 0; i < 3; i++) spike(b, 'paint', P.cBlack, 0.52 + i * 0.1, Y + 0.28, 0.62, 0.14, 0.025);
   pylon(b, -0.8, 0.78, 0.55);
-  pylon(b, 0.78, -0.78, 0.55, 'e:red:blinkB');
+  pylon(b, 0.78, -0.78, 0.55, 'e:red:blink');
   root.add(b.meshes());
   const g = new B({ aoHeight: 0 });
   // conduits in the plinth
@@ -323,7 +323,7 @@ const cFactory: F = (team) => {
   redStripZ(b, fz + 0.22, 1.42, Y + 0.015, -0.68, 0.05, 6);
   redStripZ(b, fz + 0.22, 1.42, Y + 0.015, 0.68, 0.05, 6);
   pylon(b, -1.25, 1.25, 0.6);
-  pylon(b, 1.25, 1.25, 0.6, 'e:red:blinkB');
+  pylon(b, 1.25, 1.25, 0.6, 'e:red:blink');
   root.add(b.meshes());
   // blast door
   const d = new B({ aoHeight: 0 });
@@ -365,7 +365,7 @@ const cRadar: F = (team) => {
   b.cyl('paint', P.cBlack, 0.1, 0.12, 0.2, 6, 0.6, Y + 0.1, 0.62);
   dish(b, 'paint', P.cGun, 0.22, 0.06, 0.6, Y + 0.22, 0.62, 12);
   pylon(b, -0.8, 0.75, 0.5);
-  pylon(b, 0.75, -0.8, 0.5, 'e:red:blinkB');
+  pylon(b, 0.75, -0.8, 0.5, 'e:red:blink');
   root.add(b.meshes());
   const r = new B({ aoHeight: 0 });
   r.torus('paint', P.cGun, 0.36, 0.022, 0, 0, 0, Math.PI / 2, 0, 0, 5, 20);

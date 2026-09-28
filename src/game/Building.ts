@@ -32,6 +32,8 @@ export class Building extends Entity {
   /** engineers repairing etc */
   chargeTimer = 0;
   freeGiven = false;
+  /** players who have spotted this structure (stays visible under fog afterwards) */
+  seenBy = new Set<Player>();
 
   constructor(owner: Player, def: BuildingDef, tx: number, tz: number) {
     const [w, h] = def.footprint;
