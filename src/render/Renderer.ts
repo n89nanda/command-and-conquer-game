@@ -217,6 +217,7 @@ export class GameRenderer {
     this.rig.setMap(map.w, map.h);
     this.fx.visibility = (x, z) => (this.fow ? this.fow.valueAt(x, z) : 1);
     this.fx.onScorch = (x, z, r) => this.terrain?.scorch(x, z, r);
+    this.fx.groundAt = (x, z) => map.heightAt(x, z);
     const human = world.human ?? null;
     this.views.localPlayer = human;
     this.fow.update(human ? world.fogs.get(human) ?? null : null, 1, true);
@@ -254,9 +255,19 @@ export class GameRenderer {
         this.lastMuzzle.set(e.shooter.id, [fx0, fy0, fz0]);
       }),
       ev.on('impact', (e) => fx.impact(e.x, e.y, e.z, e.kind, (e.weapon.splash ?? 0) >= 1, e.hitEntity)),
-      ev.on('explosion', (e) => fx.explosion(e.x, e.y, e.z, e.size)),
+      ev.on('explosion', (e) => {
+        if (e.sound !== 'buildingCollapse') fx.explosion(e.x, e.y, e.z, e.size);
+      }),
       ev.on('unitDied', (e) => this.views?.entityDied(e.unit)),
-      ev.on('buildingDied', (e) => this.views?.entityDied(e.building)),
+      ev.on('buildingDied', (e) => {
+        const b = e.building;
+        if (b.hp <= 0) {
+          const y = world.map.heightAt(b.x, b.z) + 0.5;
+          if (b.def.wall) fx.explosion(b.x, y, b.z, 'medium');
+          else fx.buildingCollapse(b.x, y, b.z, b.w, b.h);
+        }
+        this.views?.entityDied(b);
+      }),
       ev.on('crushed', (e) => fx.crush(e.unit.x, world.map.heightAt(e.unit.x, e.unit.z), e.unit.z)),
       ev.on('buildingPlaced', (e) => {
         const b = e.building;

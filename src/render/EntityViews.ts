@@ -235,11 +235,11 @@ export class EntityViews {
         if (a.harvesting && Math.random() < dt * 6) this.fx.harvestSparkle(x + Math.cos(hd) * 0.5, y, z + Math.sin(hd) * 0.5, map.oreType[Math.floor(u.z) * map.w + Math.floor(u.x)] === 2);
         // damage smoke
         const hr = u.hp / u.maxHp;
-        if (hr < 0.5 && u.def.category !== 'infantry') {
+        if (hr < 0.66 && u.def.category !== 'infantry') {
           v.smokeT -= dt;
           if (v.smokeT <= 0) {
-            v.smokeT = hr < 0.25 ? 0.12 : 0.3;
-            this.fx.damageSmoke(x, y + 0.4, z, hr < 0.25);
+            v.smokeT = hr < 0.33 ? 0.12 : 0.3;
+            this.fx.damageFx(x, y + 0.4, z, hr < 0.33 ? 2 : 1);
           }
         }
         // ring
@@ -260,11 +260,11 @@ export class EntityViews {
         // build-up animation is performed by the model itself (it rises out of the ground via anim.build)
         if (build < 1 && Math.random() < dt * 10) this.fx.construction(b.x, root.position.y, b.z, b.w, b.h);
         const hr = b.hp / b.maxHp;
-        if (hr < 0.5 && build >= 1) {
+        if (hr < 0.66 && build >= 1) {
           v.smokeT -= dt;
           if (v.smokeT <= 0) {
-            v.smokeT = (hr < 0.25 ? 0.15 : 0.35) / Math.max(1, (b.w * b.h) / 4);
-            this.fx.damageSmoke(b.x + (Math.random() - 0.5) * b.w * 0.7, root.position.y + v.model.height * 0.7, b.z + (Math.random() - 0.5) * b.h * 0.7, hr < 0.25);
+            v.smokeT = (hr < 0.33 ? 0.15 : 0.35) / Math.max(1, (b.w * b.h) / 4);
+            this.fx.damageFx(b.x + (Math.random() - 0.5) * b.w * 0.7, root.position.y + v.model.height * 0.7, b.z + (Math.random() - 0.5) * b.h * 0.7, hr < 0.33 ? 2 : 1);
           }
         }
         this.updateRing(v, false, 0, 0, 0, 0);

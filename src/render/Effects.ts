@@ -1158,9 +1158,9 @@ export class Effects {
     // lingering fires and a black smoke column
     const dur = Math.min(10, 6 + area * 0.4);
     const floor = g;
-    this.emit(dur, (k) => (5 + area * 0.5) * (1 - k * 0.8) * (this.quality >= 2 ? 1 : 0.5), (k) => {
+    this.emit(dur, (k) => (7 + area * 0.6) * (1 - k * 0.75) * (this.quality >= 2 ? 1 : 0.5), (k) => {
       const fx = x + rs() * w * 0.75, fz = z + rs() * h * 0.75;
-      const heat = 1 - k * 0.5;
+      const heat = 1 - k * 0.4;
       this.add.spawn({
         x: fx, y: g + 0.15 + Math.random() * 0.3, z: fz, vx: rs() * 0.3, vy: 0.9 + Math.random() * 0.8, vz: rs() * 0.3,
         life: 0.55 + Math.random() * 0.45, size: (0.7 + Math.random() * 0.6) * heat, size1: 0.25,
@@ -1368,13 +1368,13 @@ export class Effects {
     this.beam(ax, ay, az, bx, by, bz, 0.1, 6, 6, 7, 0.26, 1, 0.03, { fp: 1.5 });
     // split point a short way out of the prism; three coloured rays fan out and reconverge on target
     const sx = ax + dx * 0.18, sy = ay + (by - ay) * 0.18, sz = az + dz * 0.18;
-    const cols: [number, number, number][] = [[4, 0.5, 1.8], [0.5, 3.2, 3.6], [4, 2.8, 0.4]];
+    const cols: [number, number, number][] = [[3.2, 0.3, 1.6], [0.3, 2.4, 3.2], [3.2, 2.0, 0.2]];
     const offs = [-0.42, 0.42, 0];
     for (let i = 0; i < 3; i++) {
       const o = offs[i], c = cols[i];
       const mx = ax + dx * 0.55 + px * o, my = ay + (by - ay) * 0.55 + (i === 2 ? 0.38 : 0), mz = az + dz * 0.55 + pz * o;
-      this.beam(sx, sy, sz, mx, my, mz, 0.1, c[0], c[1], c[2], 0.3, 0.9, 0.04, { fp: 1.5 });
-      this.beam(mx, my, mz, bx, by, bz, 0.1, c[0], c[1], c[2], 0.3, 0.9, 0.04, { fp: 1.5 });
+      this.beam(sx, sy, sz, mx, my, mz, 0.15, c[0], c[1], c[2], 0.32, 1, 0.05, { fp: 1.3 });
+      this.beam(mx, my, mz, bx, by, bz, 0.15, c[0], c[1], c[2], 0.32, 1, 0.05, { fp: 1.3 });
     }
     this.add.spawn({ x: sx, y: sy, z: sz, life: 0.2, size: 0.7, size1: 0.3, r: 3, g: 3, b: 4.5, a: 0.8, a1: 0, tex: TEX.glow });
     this.flashLight(bx, by + 0.5, bz, 0xa0c0ff, 6, 0.3, 5);
@@ -1715,7 +1715,7 @@ export class Effects {
         const px = x + Math.cos(a) * rr, py = y + 6 + Math.random() * 0.5 + k * 0.6, pz = z + Math.sin(a) * rr;
         this.alpha.spawn({
           x: px, y: py, z: pz, vx: Math.cos(a) * 0.45, vy: 0.2, vz: Math.sin(a) * 0.45,
-          life: 3 + Math.random(), size: 1.3, size1: 2.6, r: 0.3, g: 0.1, b: 0.44, r1: 0.22, g1: 0.17, b1: 0.27, a: 0.42, a1: 0, ae: 1.4, fadeIn: 0.15, drag: 0.4,
+          life: 3 + Math.random(), size: 1.0, size1: 2.0, r: 0.24, g: 0.1, b: 0.34, r1: 0.2, g1: 0.16, b1: 0.24, a: 0.32, a1: 0, ae: 1.4, fadeIn: 0.15, drag: 0.4,
           tex: pick(TEX.smoke, TEX.smoke2), vrot: rs() * 0.3,
         });
         if (Math.random() < 0.5) this.add.spawn({ x: px, y: py, z: pz, vx: Math.cos(a) * 0.45, vy: 0.2, vz: Math.sin(a) * 0.45, life: 1.2, size: 1.6, size1: 2.2, r: 1.1, g: 0.2, b: 2.2, a: 0.1, a1: 0, fadeIn: 0.3, tex: TEX.glow });
