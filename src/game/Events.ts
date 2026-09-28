@@ -28,6 +28,7 @@ export interface GameEvents {
   credits: { player: Player; amount: number; x: number; z: number };
   deployed: { unit: Unit; building: Building };
   ack: { unit: Unit; kind: 'select' | 'move' | 'attack' };
+  unitAttacked: { unit: Unit; x: number; z: number };
   gameOver: { winner: Player | null; victory: boolean };
 }
 

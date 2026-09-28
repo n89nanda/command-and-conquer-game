@@ -1,5 +1,6 @@
 import { BUILDINGS, SUPERWEAPONS } from '../data/buildings';
 import { UNITS } from '../data/units';
+import { WEAPONS } from '../data/weapons';
 import type { BuildTab, BuildingDef, UnitDef } from '../data/types';
 import type { Building } from '../game/Building';
 import type { Game } from '../game/Game';
@@ -15,6 +16,24 @@ const TAB_ICONS: Record<BuildTab, string> = {
   vehicles: '<svg viewBox="0 0 24 24"><path d="M3 15h18v3H3zM6 11h10l2 3H4zM10 8h6v2h-6zM16 8.5h6v1h-6z"/><circle cx="6" cy="18.5" r="1.5"/><circle cx="12" cy="18.5" r="1.5"/><circle cx="18" cy="18.5" r="1.5"/></svg>',
   aircraft: '<svg viewBox="0 0 24 24"><path d="M12 2c1 0 1.5 1.5 1.5 3v4l8 5v2l-8-2.5V19l2.5 2v1.5L12 21.5l-4 1V21l2.5-2v-5.5L2.5 16v-2l8-5V5c0-1.5.5-3 1.5-3z"/></svg>',
 };
+const ARMOR_NAMES: Record<string, string> = { infantry: 'Infantry', light: 'Light vehicles', heavy: 'Tanks', building: 'Structures', aircraft: 'Aircraft' };
+function roleText(weaponIds: string[], armor: string): string {
+  const ws = weaponIds.map((id) => WEAPONS[id]).filter(Boolean);
+  if (!ws.length) return '';
+  const best: Record<string, number> = {};
+  for (const w of ws) for (const k of Object.keys(ARMOR_NAMES)) {
+    if (k === 'aircraft' && !w.targetsAir) continue;
+    if (k !== 'aircraft' && !w.targetsGround) continue;
+    best[k] = Math.max(best[k] ?? 0, (w.damage * (w.burst ?? 1) * (w.vs as Record<string, number>)[k]) / w.cooldown);
+  }
+  const max = Math.max(...Object.values(best), 0.01);
+  const strong = Object.keys(best).filter((k) => best[k] >= max * 0.7).map((k) => ARMOR_NAMES[k]);
+  const weak = Object.keys(ARMOR_NAMES).filter((k) => (best[k] ?? 0) < max * 0.3).map((k) => ARMOR_NAMES[k]);
+  const range = Math.max(...ws.map((w) => w.range));
+  void armor;
+  return `<div class="role"><span class="pos">Strong vs: ${strong.join(', ')}</span>${weak.length ? `<br><span class="neg">Weak vs: ${weak.join(', ')}</span>` : ''}<br><span>Range ${range}${ws.some((w) => w.targetsAir) ? ' · Anti-air' : ''}</span></div>`;
+}
+
 const TABS: BuildTab[] = ['structures', 'defense', 'infantry', 'vehicles', 'aircraft'];
 const TAB_NAMES: Record<BuildTab, string> = { structures: 'Structures', defense: 'Defenses', infantry: 'Infantry', vehicles: 'Vehicles', aircraft: 'Aircraft' };
 
@@ -287,6 +306,7 @@ export class Hud {
   private updateSuperweapons() {
     const me = this.game.me;
     const sws = [...me.superweapons.values()];
+    this.updateEnemySuperweapons();
     const key = sws.map((s) => s.id).join(',');
     if (this.swEl.dataset.key !== key) {
       this.swEl.dataset.key = key;
@@ -313,10 +333,31 @@ export class Hud {
     }
   }
 
+  private enemySwEl: HTMLElement | null = null;
+  private updateEnemySuperweapons() {
+    const g = this.game;
+    const w = g.world;
+    const rows: string[] = [];
+    for (const b of w.buildings) {
+      if (!b.def.superweapon || !b.owner.isEnemyOf(g.me) || !w.visibleTo(b, g.me) || b.constructing < 1) continue;
+      const st = b.owner.superweapons.get(b.def.superweapon);
+      if (!st) continue;
+      const def = SUPERWEAPONS[st.id];
+      rows.push(`<div class="esw"><span>ENEMY ${def.name.toUpperCase()}</span><span>${st.ready ? 'READY' : formatTime(def.chargeTime - st.charge)}</span></div>`);
+    }
+    if (!this.enemySwEl) {
+      this.enemySwEl = document.createElement('div');
+      this.enemySwEl.className = 'enemy-sw';
+      this.root.querySelector('#viewport')!.appendChild(this.enemySwEl);
+    }
+    const html = rows.join('');
+    if (this.enemySwEl.innerHTML !== html) this.enemySwEl.innerHTML = html;
+  }
+
   private updateSelection() {
     const g = this.game;
     const sel = g.selection;
-    const key = sel.map((e) => e.id).join(',') + '|' + sel.map((e) => Math.round((e.hp / e.maxHp) * 20)).join(',') + (sel[0] && sel[0].kind === 'building' ? (sel[0] as Building).repairing : '');
+    const key = sel.map((e) => e.id + (e.kind === 'unit' ? ((e as Unit).holdGround ? 'g' : '') + ((e as Unit).holdFire ? 'f' : '') : '')).join(',') + '|' + sel.map((e) => Math.round((e.hp / e.maxHp) * 20)).join(',') + (sel[0] && sel[0].kind === 'building' ? (sel[0] as Building).repairing : '');
     if (key === this.selKey) return;
     this.selKey = key;
     if (sel.length === 0) {
@@ -339,6 +380,11 @@ export class Hud {
           if (u.weapons.length) cmds += `<button class="cmd" data-c="amove"><kbd>A</kbd>Attack-move</button>`;
           if (u.def.mcv) cmds += `<button class="cmd" data-c="deploy"><kbd>D</kbd>Deploy</button>`;
           cmds += `<button class="cmd" data-c="scatter"><kbd>X</kbd>Scatter</button>`;
+          if (u.weapons.length) {
+            cmds += `<button class="cmd${u.holdGround ? ' on' : ''}" data-c="hold"><kbd>G</kbd>Hold ground</button>`;
+            cmds += `<button class="cmd${u.holdFire ? ' on' : ''}" data-c="holdfire"><kbd>F</kbd>Hold fire</button>`;
+            sub += u.holdFire ? ' · Holding fire' : u.holdGround ? ' · Holding ground' : '';
+          }
         }
       } else {
         const b = e as Building;
@@ -363,7 +409,7 @@ export class Hud {
       }
       html += '</div>';
       html += `<div class="info"><div class="title">${sel.length} units</div><div class="cmds">
-        <button class="cmd" data-c="stop"><kbd>S</kbd>Stop</button><button class="cmd" data-c="amove"><kbd>A</kbd>Attack-move</button><button class="cmd" data-c="scatter"><kbd>X</kbd>Scatter</button></div>
+        <button class="cmd" data-c="stop"><kbd>S</kbd>Stop</button><button class="cmd" data-c="amove"><kbd>A</kbd>Attack-move</button><button class="cmd" data-c="scatter"><kbd>X</kbd>Scatter</button><button class="cmd" data-c="hold"><kbd>G</kbd>Hold ground</button><button class="cmd" data-c="holdfire"><kbd>F</kbd>Hold fire</button></div>
         <div class="sub">Ctrl/⌘+1-9: assign group</div></div>`;
       this.sel.innerHTML = html;
       this.sel.querySelectorAll('.mini').forEach((m) =>
@@ -387,6 +433,20 @@ export class Hud {
             const a = Math.random() * Math.PI * 2;
             u.issue({ type: 'move', x: u.x + Math.cos(a) * 2.5, z: u.z + Math.sin(a) * 2.5 }, g.world);
           });
+        if (c === 'hold') {
+          const on = !units.every((u) => u.holdGround);
+          units.forEach((u) => {
+            u.holdGround = on;
+            u.issue({ type: 'idle' }, g.world);
+          });
+        }
+        if (c === 'holdfire') {
+          const on = !units.every((u) => u.holdFire);
+          units.forEach((u) => {
+            u.holdFire = on;
+            if (on) u.target = null;
+          });
+        }
         const b0 = g.selection[0] as Building;
         if (c === 'repair' && b0) g.world.toggleRepair(b0);
         if (c === 'sell' && b0) g.world.sell(b0);
@@ -437,7 +497,8 @@ export class Hud {
       const u = def as UnitDef;
       stats += `<span>HP ${u.hp}</span><span>SPD ${u.speed.toFixed(1)}</span>`;
     }
-    this.tooltip.innerHTML = `<h5>${def.name}</h5><div class="stats">${stats}</div><p>${def.description}</p>${missing.length ? `<div class="req">Requires: ${missing.join(', ')}</div>` : ''}<p style="margin-top:6px;font-size:11px">Left-click: build${!isB ? ' (Shift: ×5)' : ''} · Right-click: hold / cancel</p>`;
+    const role = roleText((def as { weapons?: string[] }).weapons ?? [], isB ? 'building' : (def as UnitDef).armor);
+    this.tooltip.innerHTML = `<h5>${def.name}</h5><div class="stats">${stats}</div><p>${def.description}</p>${role}${missing.length ? `<div class="req">Requires: ${missing.join(', ')}</div>` : ''}<p style="margin-top:6px;font-size:11px">Left-click: build${!isB ? ' (Shift: ×5)' : ''} · Right-click: hold / cancel</p>`;
     const r = (this.cameoEls.get(id)?.el ?? this.grid).getBoundingClientRect();
     this.tooltip.style.left = Math.max(8, r.left - 282) + 'px';
     this.tooltip.style.top = Math.min(window.innerHeight - 200, r.top) + 'px';

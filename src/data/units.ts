@@ -22,13 +22,13 @@ const list: UnitDef[] = [
   },
   {
     id: 'marksman', name: 'Ghost Marksman', faction: 'aegis', category: 'infantry', tab: 'infantry', producer: 'barracks',
-    cost: 700, buildTime: 12, hp: 100, armor: 'infantry', speed: 1.3, turnRate: 10, sight: 9, radius: 0.18,
+    cost: 600, buildTime: 11, hp: 100, armor: 'infantry', speed: 1.3, turnRate: 10, sight: 9.5, radius: 0.18,
     weapons: ['sniper'], prereqs: ['a_barracks', 'a_techlab'], crushable: true, voice: 'infantry', deathExplosion: 'infantry', techLevel: 3,
     description: 'Elite long-range rail-rifle. Eliminates infantry with a single shot.',
   },
   {
     id: 'scout', name: 'Pathfinder Scout', faction: 'aegis', category: 'vehicle', tab: 'vehicles', producer: 'factory',
-    cost: 500, buildTime: 8, hp: 220, armor: 'light', speed: 4.2, turnRate: 5, sight: 8, radius: 0.35,
+    cost: 400, buildTime: 7, hp: 220, armor: 'light', speed: 4.2, turnRate: 5, sight: 8, radius: 0.35,
     weapons: ['buggyMg'], prereqs: ['a_factory'], hasTurret: true, turretTurnRate: 8, voice: 'vehicle', deathExplosion: 'small',
     description: 'Fast armoured recon vehicle with a heavy machine gun. Can engage aircraft.',
   },
@@ -46,7 +46,7 @@ const list: UnitDef[] = [
   },
   {
     id: 'titan', name: 'Titan Assault Tank', faction: 'aegis', category: 'vehicle', tab: 'vehicles', producer: 'factory',
-    cost: 1800, buildTime: 24, hp: 1200, armor: 'heavy', speed: 1.5, turnRate: 1.6, sight: 7, radius: 0.6,
+    cost: 2000, buildTime: 25, hp: 1050, armor: 'heavy', speed: 1.5, turnRate: 1.6, sight: 7, radius: 0.6,
     weapons: ['titanCannon', 'titanMissiles'], prereqs: ['a_factory', 'a_techlab'], hasTurret: true, turretTurnRate: 1.8, crusher: true,
     selfHeal: 2, voice: 'heavy', deathExplosion: 'large', techLevel: 3,
     description: 'Twin-cannon behemoth with anti-air missile pods. Self-repairs when damaged.',
@@ -79,7 +79,7 @@ const list: UnitDef[] = [
   },
   {
     id: 'zealot', name: 'Flame Zealot', faction: 'covenant', category: 'infantry', tab: 'infantry', producer: 'barracks',
-    cost: 250, buildTime: 6, hp: 110, armor: 'infantry', speed: 1.3, turnRate: 10, sight: 5, radius: 0.18,
+    cost: 220, buildTime: 6, hp: 110, armor: 'infantry', speed: 1.3, turnRate: 10, sight: 5, radius: 0.18,
     weapons: ['flameInf'], prereqs: ['c_barracks'], crushable: true, voice: 'zealot', deathExplosion: 'infantry',
     description: 'Short-ranged flamethrower. Incinerates infantry and structures.',
   },
@@ -121,7 +121,7 @@ const list: UnitDef[] = [
   },
   {
     id: 'prism', name: 'Rift Prism Tank', faction: 'covenant', category: 'vehicle', tab: 'vehicles', producer: 'factory',
-    cost: 1500, buildTime: 20, hp: 650, armor: 'heavy', speed: 1.9, turnRate: 2, sight: 7, radius: 0.55,
+    cost: 1300, buildTime: 18, hp: 750, armor: 'heavy', speed: 1.9, turnRate: 2, sight: 7, radius: 0.55,
     weapons: ['beamTank'], prereqs: ['c_factory', 'c_temple'], hasTurret: true, turretTurnRate: 2.5, crusher: true, voice: 'heavy', deathExplosion: 'large', techLevel: 3,
     description: 'Focuses raw Rift energy into a searing beam. Melts armour and buildings alike.',
   },

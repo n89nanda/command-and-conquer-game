@@ -427,7 +427,8 @@ export class App {
         <span><kbd>Alt</kbd>+<kbd>right click</kbd></span><span>Force fire (attack ground / anything)</span>
         <span><kbd>Shift</kbd>+<kbd>right click</kbd></span><span>Queue waypoints</span>
         <span><kbd>A</kbd></span><span>Attack-move (then click)</span>
-        <span><kbd>S</kbd> / <kbd>G</kbd></span><span>Stop / guard</span>
+        <span><kbd>S</kbd></span><span>Stop</span>
+        <span><kbd>G</kbd> / <kbd>F</kbd></span><span>Hold ground / hold fire (toggle)</span>
         <span><kbd>D</kbd></span><span>Deploy MCV</span>
         <span><kbd>X</kbd></span><span>Scatter</span>
         <span><kbd>⌘/Ctrl</kbd>+<kbd>1-9</kbd></span><span>Assign group · <kbd>1-9</kbd> recall (tap twice to jump)</span>

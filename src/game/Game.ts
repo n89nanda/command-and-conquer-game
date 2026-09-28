@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, SUPERWEAPONS } from '../data/buildings';
 import { UNITS } from '../data/units';
 import { FACTIONS } from '../data/factions';
 import type { BuildTab, SoundId } from '../data/types';
@@ -222,7 +222,7 @@ export class Game {
   private checkEnd() {
     if (this.missionScript) return; // missions decide themselves
     if (this.world.tickCount % 30 !== 0) return;
-    const alive = (p: Player) => this.world.buildings.some((b) => b.owner === p && !b.def.wall) || this.world.units.some((u) => u.owner === p && !u.def.harvester);
+    const alive = (p: Player) => this.world.buildings.some((b) => b.owner === p && !b.def.wall && b.def.faction !== 'both') || this.world.units.some((u) => u.owner === p && !u.def.harvester);
     for (const p of this.world.players) {
       if (p.isNeutral || p.defeated) continue;
       if (!alive(p)) {
@@ -344,6 +344,14 @@ export class Game {
       }),
       ev.on('captured', (e) => {
         if (e.to === me) audio.play('buildComplete');
+      }),
+      ev.on('unitAttacked', (e) => {
+        // announce only when the fight is outside the current view
+        const r = this.renderer.rig;
+        if (Math.abs(e.x - r.targetX) > 14 || Math.abs(e.z - r.targetZ) > 10) {
+          this.hooks.onMessage?.('Unit under attack.', '#ff8a6a');
+          audio.speak('Unit under attack.', 'announcer', { faction: me.faction, priority: 1 });
+        }
       }),
       ev.on('damaged', (e) => {
         if (e.entity.owner === me) this.combatIntensity = Math.min(1.2, this.combatIntensity + 0.01);
@@ -544,12 +552,26 @@ export class Game {
       case 's':
         for (const u of myUnits) u.issue({ type: 'idle' }, this.world);
         break;
-      case 'g':
+      case 'g': {
+        // toggle hold-ground stance
+        const on = !myUnits.every((u) => u.holdGround);
         for (const u of myUnits) {
+          u.holdGround = on;
           u.holdFire = false;
           u.issue({ type: 'idle' }, this.world);
         }
+        if (myUnits.length) this.hooks.onMessage?.(on ? 'Stance: hold ground.' : 'Stance: aggressive.', '#cfe3ff');
         break;
+      }
+      case 'f': {
+        const on = !myUnits.every((u) => u.holdFire);
+        for (const u of myUnits) {
+          u.holdFire = on;
+          if (on) u.target = null;
+        }
+        if (myUnits.length) this.hooks.onMessage?.(on ? 'Stance: hold fire.' : 'Weapons free.', '#cfe3ff');
+        break;
+      }
       case 'd': {
         const mcvs = myUnits.filter((u) => u.def.mcv);
         for (const u of mcvs) u.issue({ type: 'deploy' }, this.world);
@@ -756,7 +778,7 @@ export class Game {
     }
     // prefer combat units over harvesters when mixed
     let list: Unit[] = res;
-    const combat = res.filter((u) => !u.def.harvester);
+    const combat = res.filter((u) => !u.def.harvester && !u.def.mcv && !u.def.engineer);
     if (combat.length > 0) list = combat;
     if (add) this.select([...new Set([...this.selection, ...list])]);
     else this.select(list);
@@ -1013,6 +1035,12 @@ export class Game {
       }
       const s = free.splice(bi, 1)[0];
       u.issue({ type: 'move', x: s.x, z: s.z, attackMove }, this.world);
+    }
+    // a compact group travels together at the pace of its slowest member
+    const compact = units.every((u) => Math.hypot(u.x - c.x, u.z - c.z) < 7);
+    if (compact && units.length > 1 && !units.some((u) => u.def.flying)) {
+      const slowest = Math.min(...units.map((u) => u.def.speed));
+      for (const u of units) u.speedCap = slowest;
     }
   }
 
@@ -1282,7 +1310,8 @@ export class Game {
       const pxPerUnit = H / (this.renderer.rig.zoom * 0.62);
       ctx.strokeStyle = 'rgba(255,80,60,0.9)';
       ctx.lineWidth = 2;
-      const r = 4 * pxPerUnit;
+      const swDef = SUPERWEAPONS[this.superweaponId as keyof typeof SUPERWEAPONS];
+      const r = (swDef?.radius ?? 4) * pxPerUnit;
       ctx.beginPath();
       ctx.ellipse(this.scr.x, this.scr.y, r, r * 0.6, 0, 0, Math.PI * 2);
       ctx.stroke();

@@ -33,7 +33,8 @@ npm run build:single   # rebuilds release-style single file into dist-single/ind
 | Force fire | Alt+right click |
 | Queue waypoints | Shift+right click |
 | Attack-move | `A`, then click |
-| Stop / Guard / Scatter | `S` / `G` / `X` |
+| Stop / Scatter | `S` / `X` |
+| Hold ground / Hold fire | `G` / `F` (toggle) |
 | Deploy MCV | `D`, or double-click the MCV |
 | Control groups | ⌘ or Ctrl + `1`–`9` to assign, `1`–`9` to select (double tap to jump) |
 | Select army on screen / everywhere | `Q` / `E` |

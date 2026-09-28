@@ -245,11 +245,12 @@ export function generateMap(spec: MapSpec): GeneratedMap {
     }
 
   // ---- ore fields
-  const placeField = (fx: number, fz: number, r: number, rich: boolean) => {
+  const placeField = (fx: number, fz: number, r: number, rich: boolean, flip = false) => {
     for (let z = Math.floor(fz - r - 1); z <= fz + r + 1; z++)
       for (let x = Math.floor(fx - r - 1); x <= fx + r + 1; x++) {
         if (!map.inBounds(x, z)) continue;
-        const d = Math.hypot(x - fx, z - fz) / r + (valueNoise(x * 0.5, z * 0.5, seed + 77) - 0.5) * 0.7;
+        const lx = (x - fx) * (flip ? -1 : 1), lz = (z - fz) * (flip ? -1 : 1);
+        const d = Math.hypot(x - fx, z - fz) / r + (valueNoise(lx * 0.5 + 50, lz * 0.5 + 50, seed + 77) - 0.5) * 0.7;
         if (d > 1) continue;
         const i = z * w + x;
         const t = map.terrain[i];
@@ -257,17 +258,30 @@ export function generateMap(spec: MapSpec): GeneratedMap {
         const richTile = rich && d < 0.55;
         map.oreType[i] = richTile ? 2 : 1;
         const max = richTile ? RICH_MAX : ORE_MAX;
-        map.ore[i] = max * (1 - d * 0.6) * (0.7 + rng.next() * 0.3);
+        map.ore[i] = max * (1 - d * 0.6) * (0.78 + valueNoise(lx * 1.3 + 9, lz * 1.3 + 9, seed + 5) * 0.22);
       }
   };
   const oreAmt = spec.ore;
-  for (const s of starts) {
-    // home field: toward map centre
-    const a = Math.atan2(cz - s.z, cx - s.x) + (rng.next() - 0.5) * 1.2;
-    placeField(s.x + Math.cos(a) * 11, s.z + Math.sin(a) * 11, 3.2 + oreAmt, false);
-    // secondary field to the side
-    const b = a + (rng.next() > 0.5 ? 1 : -1) * 1.3;
-    placeField(s.x + Math.cos(b) * 17, s.z + Math.sin(b) * 17, 2.6 + oreAmt, false);
+  // identical home fields for every start (same offsets relative to the map centre) so no start is favoured
+  const homeA = (rng.next() - 0.5) * 1.2;
+  const sideB = (rng.next() > 0.5 ? 1 : -1) * 1.3;
+  const homeFields: { x: number; z: number; r: number }[] = [];
+  for (let i = 0; i < starts.length; i++) {
+    const s = starts[i];
+    let fields: { x: number; z: number; r: number }[];
+    if (spec.players === 2 && i === 1) {
+      // exact point-mirror of start 0's fields
+      fields = homeFields.map((f) => ({ x: w - 1 - f.x, z: h - 1 - f.z, r: f.r }));
+    } else {
+      const a = Math.atan2(cz - s.z, cx - s.x) + homeA;
+      const b = a + sideB;
+      fields = [
+        { x: s.x + Math.cos(a) * 11, z: s.z + Math.sin(a) * 11, r: 3.2 + oreAmt },
+        { x: s.x + Math.cos(b) * 17, z: s.z + Math.sin(b) * 17, r: 2.6 + oreAmt },
+      ];
+      if (i === 0) homeFields.push(...fields);
+    }
+    for (const f of fields) placeField(f.x, f.z, f.r, false, spec.players === 2 && i === 1);
   }
   // contested fields
   placeField(cx, cz, 3 + oreAmt * 2, true);
@@ -276,8 +290,9 @@ export function generateMap(spec: MapSpec): GeneratedMap {
     const a = (k / nContested) * Math.PI * 2 + seed;
     const r = Math.min(w, h) * (0.22 + rng.next() * 0.1);
     const fx = cx + Math.cos(a) * r, fz = cz + Math.sin(a) * r;
-    placeField(fx, fz, 2.5 + oreAmt * 1.5, rng.chance(0.35));
-    if (spec.players === 2) placeField(w - 1 - fx, h - 1 - fz, 2.5 + oreAmt * 1.5, rng.chance(0.35));
+    const rich = rng.chance(0.35);
+    placeField(fx, fz, 2.5 + oreAmt * 1.5, rich);
+    if (spec.players === 2) placeField(w - 1 - fx, h - 1 - fz, 2.5 + oreAmt * 1.5, rich, true);
   }
   // remove ore from start centres
   for (const s of starts)

@@ -162,11 +162,10 @@ export class BasePlanner {
   private window = { x0: 0, z0: 0, x1: 0, z1: 0 };
 
   /** Flood fill from the window border. Returns reached passable tile count. */
-  private flood(blockTx: number, blockTz: number, bw: number, bh: number): number {
+  private flood(blockTx: number, blockTz: number, bw: number, bh: number, reach = this.reach): number {
     const m = this.world.map;
     const { x0, z0, x1, z1 } = this.window;
     const gen = ++this.reachGen;
-    const reach = this.reach;
     const q = this.bfsQueue;
     let qh = 0, qt = 0;
     const blocked = (x: number, z: number) => x >= blockTx && x < blockTx + bw && z >= blockTz && z < blockTz + bh;
@@ -200,6 +199,10 @@ export class BasePlanner {
     const m = this.world.map;
     return m.inBounds(x, z) && this.reach[z * m.w + x] === this.reachGen;
   }
+
+  /** Baseline flood kept in its own buffer so every candidate needs only one more fill. */
+  private baseReach: Uint32Array | null = null;
+  private baseGen = 0;
 
   // ---------------------------------------------------------------- main search
   findPlacement(defId: string, role: BuildingRole, ctx: PlacementContext): Spot | null {
@@ -316,16 +319,17 @@ export class BasePlanner {
     cands.sort((a, b) => a.s - b.s);
 
     // baseline reachability
-    const before = this.flood(-99, -99, 0, 0);
+    this.baseReach ??= new Uint32Array(m.w * m.h);
+    const before = this.flood(-99, -99, 0, 0, this.baseReach);
+    this.baseGen = this.reachGen;
     let tested = 0;
     for (const c of cands) {
-      if (tested >= 30) break;
+      if (tested >= 16) break;
       if (!world.canPlace(this.player, defId, c.tx, c.tz)) continue;
       tested++;
       // how many of the footprint tiles were reachable before (they'll vanish)
-      this.flood(-99, -99, 0, 0);
       let footReach = 0;
-      for (let z = c.tz; z < c.tz + bh; z++) for (let x = c.tx; x < c.tx + bw; x++) if (this.isReached(x, z)) footReach++;
+      for (let z = c.tz; z < c.tz + bh; z++) for (let x = c.tx; x < c.tx + bw; x++) if (this.baseReach[z * m.w + x] === this.baseGen) footReach++;
       const after = this.flood(c.tx, c.tz, bw, bh);
       if (after < before - footReach) continue; // would enclose something
       if (exit) {

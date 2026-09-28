@@ -9,6 +9,19 @@
 //   upkeep     – repairs, emergency selling, superweapons
 //
 // Faction agnostic: every unit / structure is picked by role derived from data.
+//
+// Usage:
+//   player.ai = new SkirmishAI(world, player, 'normal');
+//   // mission base that only defends / rebuilds, never builds superweapons:
+//   player.ai = new SkirmishAI(world, p, 'hard', { passive: true, techLimit: 2, allowSuperweapons: false });
+//   // scripted opponent: custom opening, first wave after 8 minutes
+//   player.ai = new SkirmishAI(world, p, 'easy', { buildOrder: ['power', 'refinery', 'barracks'], attackDelay: 480 });
+//
+// Difficulty summary (see PARAMS): easy is slow, forgetful and never micros;
+// normal is competent and fog-honest; hard adds micro (focus fire, retreat and
+// repair, raids, pre-attack scouting) and knows where enemy buildings are;
+// brutal is hard with faster reactions and +25% refinery income.
+// Call dispose() when the AI is removed from a live world (detaches listeners).
 
 import { BUILDINGS, SUPERWEAPONS } from '../../data/buildings';
 import { UNITS } from '../../data/units';
@@ -78,7 +91,7 @@ const PARAMS: Record<Difficulty, AITuning> = {
     harvPerRef: 1, maxRefineries: 2, maxDefenses: 2, micro: false, retreatHp: 0, squadRetreat: 0,
     counter: 0.15, incomeBonus: 0, cheatBase: false, mistakes: 0.3, buildDelay: [2, 6], armyQueue: 1, prodPause: 6,
     maxAircraft: 1, harass: false, earlyHarass: false, engineers: 1, expand: false, sellDying: false,
-    techTime: 1e9, swTime: 1e9, repairBelow: 0.4, reinforce: false, focusFire: false, armyCap: 30,
+    techTime: 900, swTime: 1e9, repairBelow: 0.4, reinforce: false, focusFire: false, armyCap: 30,
   },
   normal: {
     think: 0.6, firstAttack: 330, minAttackGap: 90, waveMin: 6, waveGrowth: 2, waveMax: 18,
@@ -142,6 +155,8 @@ interface Squad {
   /** has gathered outside the target area once (stageT < 0: not yet) */
   staged: boolean;
   stageT: number;
+  /** route still to be planned (deferred for CPU budget) */
+  replan: boolean;
 }
 
 interface SeenUnit {
@@ -298,6 +313,22 @@ export class SkirmishAI {
       }),
       world.events.on('unitDied', (e) => {
         this.seen.delete(e.unit.id);
+        const v = e.unit.def.cost;
+        if (e.unit.owner === this.player) this.perfRec(e.unit.def.id).lost += v;
+        else if (e.killer && e.killer.owner === this.player && e.killer.kind === 'unit' && e.unit.owner.isEnemyOf(this.player)) this.perfRec((e.killer as Unit).def.id).killed += v;
+      }),
+      world.events.on('buildingDied', (e) => {
+        if (e.killer && e.killer.owner === this.player && e.killer.kind === 'unit' && e.building.owner.isEnemyOf(this.player) && !e.building.def.wall) {
+          this.perfRec((e.killer as Unit).def.id).killed += e.building.def.cost * 0.5;
+        }
+      }),
+      world.events.on('damaged', (e) => {
+        // credit damage dealt too (kills alone are noisy): value-equivalent of the hp removed
+        const a = e.attacker;
+        if (!a || a.owner !== this.player || a.kind !== 'unit' || !e.entity.owner.isEnemyOf(this.player)) return;
+        const t = e.entity;
+        const frac = Math.min(1, e.amount / t.maxHp) * (t.kind === 'building' ? 0.5 : 1);
+        this.perfRec((a as Unit).def.id).dealt += t.cost * frac;
       }),
       world.events.on('captured', (e) => {
         if (e.to === this.player && e.building.def.id === 'n_derrick') this.stats.derricksCaptured++;
@@ -313,6 +344,30 @@ export class SkirmishAI {
         }),
       );
     }
+  }
+
+  // ---------------------------------------------------------------- unit type performance
+  /** Per unit type: value dealt (damage in credit terms), value killed, value lost. */
+  readonly perf = new Map<string, { dealt: number; killed: number; lost: number }>();
+  private perfRec(id: string) {
+    let r = this.perf.get(id);
+    if (!r) {
+      r = { dealt: 0, killed: 0, lost: 0 };
+      this.perf.set(id, r);
+    }
+    return r;
+  }
+  /**
+   * How well this unit type has traded so far this match (1 = even). Starts
+   * neutral and only moves once there is real evidence.
+   */
+  private tradeFactor(id: string): number {
+    const r = this.perf.get(id);
+    const d = UNITS[id];
+    if (!r || !d) return 1;
+    const prior = d.cost * 3;
+    const eff = (r.dealt * 0.7 + r.killed * 0.3 + prior) / (r.lost + prior);
+    return Math.max(0.3, Math.min(2.2, eff));
   }
 
   /** One-line summary of the AI's internal state (debugging / test harness). */
@@ -343,6 +398,14 @@ export class SkirmishAI {
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
+  private heavyLeft = 1;
+  /** Take the think's budget for one expensive operation (flood fills, long A*, map scans). */
+  private useHeavy(): boolean {
+    if (this.heavyLeft <= 0) return false;
+    this.heavyLeft--;
+    return true;
   }
 
   private say(msg: string) {
@@ -450,6 +513,7 @@ export class SkirmishAI {
     const world = this.world;
     this.now = world.time;
     this.frame++;
+    this.heavyLeft = 1; // at most one expensive search per think (spreads load over ticks)
     const p = this.player;
     this.my = [];
     for (const u of world.units) if (u.owner === p && !u.dead) this.my.push(u);
@@ -469,9 +533,10 @@ export class SkirmishAI {
 
     if (this.now - this.lastGeom > 5) this.updateGeometry();
     if (this.now - this.lastIntel >= 1) this.updateIntel();
-    if (this.now - this.lastOre > 20) this.updateOre();
+    if ((this.now - this.lastOre > 20 && this.useHeavy()) || this.oreCells.length === 0 && this.lastOre < 0) this.updateOre();
 
     this.assignNewUnits();
+    this.unstickHarvesters();
     this.handleMcvs();
     this.economy();
     this.production();
@@ -692,7 +757,7 @@ export class SkirmishAI {
     const m = this.world.map;
     const refs = this.myBuildings.filter((b) => b.def.refinery && !b.dead);
     const key = refs.map((b) => b.id).join(',');
-    if (!this.refDist || key !== this.refDistKey || this.now - this.refDistT > 20) {
+    if (!this.refDist || ((key !== this.refDistKey || this.now - this.refDistT > 20) && this.useHeavy())) {
       this.refDistKey = key;
       this.refDistT = this.now;
       const n = m.w * m.h;
@@ -1018,7 +1083,7 @@ export class SkirmishAI {
   private refSiteCache: { t: number; ok: boolean } = { t: -999, ok: false };
   /** Is there a refinery site with a worthwhile amount of ore? Sets expansionTarget otherwise. */
   private refinerySiteOk(): boolean {
-    if (this.now - this.refSiteCache.t < 8) return this.refSiteCache.ok;
+    if (this.now - this.refSiteCache.t < 8 || !this.useHeavy()) return this.refSiteCache.ok;
     const ref = this.kit.byRole.refinery;
     let ok = false;
     if (ref) {
@@ -1133,6 +1198,7 @@ export class SkirmishAI {
   }
 
   private placeReady(tab: BuildTab) {
+    if (!this.useHeavy()) return; // next think
     const p = this.player;
     const q = p.queues[tab];
     const id = q.ready!;
@@ -1282,7 +1348,8 @@ export class SkirmishAI {
   private production() {
     const p = this.player;
     const army = this.armyUnits();
-    const cap = this.P.armyCap;
+    // floating a lot of money: allow a bigger army rather than sit on it
+    const cap = this.P.armyCap + (p.credits > 6000 ? 10 : 0) + (p.credits > 15000 ? 10 : 0);
     if (army.length >= cap) return;
     // economic reserve: keep money for the structure being built and a pending harvester
     let reserve = 0;
@@ -1346,6 +1413,27 @@ export class SkirmishAI {
     return this.profCache;
   }
 
+  private rangeCache = { t: -999, v: 5.5 };
+  /** Cost-weighted weapon range of the enemy forces we expect to fight (units and defences). */
+  private enemyRange(): number {
+    if (this.now - this.rangeCache.t < 10) return this.rangeCache.v;
+    let sum = 0, w = 0;
+    for (const sv of this.seen.values()) {
+      if (sv.unit.dead || this.now - sv.t > 180 || !sv.def.weapons.length || sv.def.flying) continue;
+      sum += unitInfo(sv.def).range * sv.def.cost;
+      w += sv.def.cost;
+    }
+    for (const b of this.knownBuildings) {
+      if (!b.weapons.length || b.owner.isNeutral) continue;
+      const r = Math.max(...b.weapons.map((x) => x.def.range));
+      sum += r * b.def.cost * 0.7;
+      w += b.def.cost * 0.7;
+    }
+    const v = w > 0 ? (sum + 5.5 * 2000) / (w + 2000) : 5.5;
+    this.rangeCache = { t: this.now, v };
+    return v;
+  }
+
   private chooseUnit(tab: BuildTab, army: Unit[]): string | null {
     const mix = this.enemyMix();
     const prof = this.enemyProfile();
@@ -1399,7 +1487,14 @@ export class SkirmishAI {
       const d = ui.def;
       if (!this.canBuild(d.id)) continue;
       let s = fightValue(ui, prof, mix.building);
-      s *= 1 + (ui.range - 5) * 0.05;
+      // closing the distance under fire: short-ranged units pay for it
+      if (ui.role !== 'aircraft') {
+        const gap = Math.max(0, this.enemyRange() - ui.range);
+        s /= 1 + (0.45 * gap) / Math.max(0.8, d.speed);
+      }
+      s *= 1 + (ui.range - 5) * 0.03;
+      // learn from this match: favour types that trade well, drop the ones that don't
+      if (this.difficulty !== 'easy') s *= Math.pow(this.tradeFactor(d.id), this.P.counter);
       if (d.category === 'vehicle') s *= 1.1;
       if (d.crusher) s *= 1 + prof.mix.infantry * 0.3;
       if ((d.techLevel ?? 1) >= 3) s *= 1.1;
@@ -1408,12 +1503,18 @@ export class SkirmishAI {
       const share = (counts.get(d.id) ?? 0) / total;
       if (share > 0.3) s *= Math.max(0.25, 1 - (share - 0.3) * 2.5);
       if (ui.role === 'artillery') {
-        if (arty / total > 0.15 || total < 6) s *= 0.25;
-        else s *= 1.1;
+        let defV = 0;
+        for (const b of this.knownBuildings) if (b.weapons.length && !b.owner.isNeutral) defV += b.def.cost;
+        const turtle = defV > 4000 || prof.mix.infantry > 0.45;
+        const maxShare = turtle ? 0.3 : 0.15;
+        if (arty / total > maxShare || total < 6) s *= 0.25;
+        else s *= turtle ? 1.5 : 1.1;
       }
       if (ui.role === 'aircraft') {
         if (air >= this.P.maxAircraft) continue;
         if (this.opts.passive) continue;
+        const r = this.perf.get(d.id);
+        if (r && r.lost >= d.cost * 2 && this.tradeFactor(d.id) < 0.8) continue; // not paying off
       }
       if (ui.role === 'infantry' && inf / total > 0.55) s *= 0.6;
       if (mix.aircraft > 0.05 && ui.antiAir) s *= 1.2;
@@ -1528,7 +1629,7 @@ export class SkirmishAI {
     }
     this.defend(pool);
     this.microRetreat();
-    if (this.difficulty !== 'easy') this.rangeMicro();
+
     this.updateSquads();
     this.scouting();
     this.aircraft();
@@ -1627,37 +1728,6 @@ export class SkirmishAI {
       if (!best) continue;
       if (bd < 9) this.orderAttack(u, best, 1.5);
       else this.orderMove(u, best.x, best.z, true, 2);
-    }
-  }
-
-  /**
-   * Units with several weapons of different reach (e.g. a tank with a long-range
-   * missile pod) stop at the longest range, so the main gun never fires
-   * (see Unit.engage). Step such units into range of their best weapon.
-   */
-  private rangeMicro() {
-    for (const u of this.my) {
-      if (u.weapons.length < 2 || u.def.flying) continue;
-      const t = u.target;
-      if (!t || t.dead || u.moving || u.needsPath) continue;
-      let best = null as (typeof u.weapons)[number] | null;
-      let bd = 0, maxR = 0;
-      for (const w of u.weapons) {
-        const hit = t.isAir ? w.def.targetsAir : w.def.targetsGround && w.def.vs[t.armor] > 0;
-        if (!hit) continue;
-        maxR = Math.max(maxR, w.def.range);
-        const dps = (w.def.damage * (w.def.burst ?? 1) * w.def.vs[t.armor]) / w.def.cooldown;
-        if (dps > bd) {
-          bd = dps;
-          best = w;
-        }
-      }
-      if (!best || best.def.range >= maxR) continue;
-      const d = t.distTo(u.x, u.z);
-      if (d <= best.def.range || d > maxR + 0.3) continue;
-      const dx = t.x - u.x, dz = t.z - u.z, dl = Math.hypot(dx, dz) || 1;
-      const step = d - best.def.range + 0.7;
-      this.orderMove(u, u.x + (dx / dl) * step, u.z + (dz / dl) * step, true, 1.5);
     }
   }
 
@@ -1801,7 +1871,7 @@ export class SkirmishAI {
       id: squadIds++, kind, units: [...units], state: 'advance', objective: null, objX: c.x, objZ: c.z, path: [], wp: 0,
       startValue: units.reduce((a, u) => a + this.value(u), 0), created: this.now, regroupT: -999,
       lastCx: c.x, lastCz: c.z, progressT: this.now, fightX: 0, fightZ: 0, lastEngageT: -999, join,
-      staged: kind === 'harass' || !!join || this.difficulty === 'easy' || units.length < 4, stageT: -1,
+      staged: kind === 'harass' || !!join || this.difficulty === 'easy' || units.length < 4, stageT: -1, replan: false,
     };
     for (const u of units) {
       this.setJob(u, kind === 'harass' ? 'harass' : 'squad');
@@ -1855,10 +1925,24 @@ export class SkirmishAI {
     sq.objective = obj.entity;
     sq.objX = obj.x;
     sq.objZ = obj.z;
+    this.planRoute(sq, fx, fz);
+  }
+
+  /** Waypoints ~9 tiles apart along an A* route to the squad's objective (CPU-budgeted). */
+  private planRoute(sq: Squad, fx: number, fz: number) {
     const m = this.world.map;
-    const np = m.nearestPassable(obj.x, obj.z, 12);
-    const gx = np ? np[0] + 0.5 : obj.x, gz = np ? np[1] + 0.5 : obj.z;
-    const raw = this.world.pathfinder.find(fx, fz, gx, gz, 40000);
+    const np = m.nearestPassable(sq.objX, sq.objZ, 12);
+    const gx = np ? np[0] + 0.5 : sq.objX, gz = np ? np[1] + 0.5 : sq.objZ;
+    sq.progressT = this.now;
+    sq.wp = 0;
+    if (!this.useHeavy()) {
+      // no budget left this think: head straight for it, plan the route next think
+      sq.path = [{ x: gx, z: gz }];
+      sq.replan = true;
+      return;
+    }
+    sq.replan = false;
+    const raw = this.world.pathfinder.find(fx, fz, gx, gz, 20000);
     // resample into waypoints ~9 tiles apart
     const pts: { x: number; z: number }[] = [];
     let px = fx, pz = fz;
@@ -2016,6 +2100,10 @@ export class SkirmishAI {
   }
 
   private updateSquad(sq: Squad) {
+    if (sq.replan && this.heavyLeft > 0) {
+      const c0 = this.centroid(sq.units);
+      if (c0) this.planRoute(sq, c0.x, c0.z);
+    }
     // (staging: before the final approach the whole group gathers so it hits at once)
     const c = this.centroid(sq.units);
     if (!c) return;
@@ -2073,6 +2161,12 @@ export class SkirmishAI {
       this.retarget(sq, c.x, c.z);
     }
     const back = { x: -this.ex, z: -this.ez };
+    // march in formation: everybody moves at the pace of the slowest (non-artillery) member
+    let slow = Infinity;
+    if (sq.state !== 'fight' && sq.kind === 'attack' && this.difficulty !== 'easy') {
+      for (const u of sq.units) if (unitInfo(u.def).role !== 'artillery' && Math.hypot(u.x - c.x, u.z - c.z) < 12) slow = Math.min(slow, u.def.speed);
+    }
+    for (const u of sq.units) u.speedCap = Math.hypot(u.x - c.x, u.z - c.z) > 6 ? Infinity : slow; // stragglers catch up
     if (sq.state === 'fight') {
       // focus fire at hard+: pick the weakest dangerous enemy in reach
       let focusT: Entity | null = null;
@@ -2355,24 +2449,40 @@ export class SkirmishAI {
   }
 
   // ---------------------------------------------------------------- aircraft
+  /**
+   * Aircraft fly in groups: wait until 2-4 are armed and idle, then strike the
+   * same target (preferably away from known anti-air). A lone aircraft only
+   * flies to defend the base.
+   */
   private aircraft() {
+    const ready: Unit[] = [];
+    let total = 0;
     for (const u of this.my) {
       if (!u.def.flying) continue;
+      total++;
       const s = this.st(u);
       s.job = 'air';
       if (u.order.type === 'returnToBase' || u.order.type === 'attack') continue;
       if (u.def.ammo && u.ammo < u.def.ammo) continue;
+      if (u.hp < u.maxHp * 0.6) continue;
       if (this.now - s.lastOrder < 3) continue;
-      if (this.opts.passive && this.now - this.lastThreatT > 5) continue;
-      const t = this.airTarget(u);
-      if (t) {
-        s.lastOrder = this.now;
-        u.issue({ type: 'attack', target: t }, this.world);
-      }
+      ready.push(u);
+    }
+    if (ready.length === 0) return;
+    const homeThreat = this.now - this.lastThreatT < 4;
+    if (this.opts.passive && !homeThreat) return;
+    const need = homeThreat ? 1 : Math.min(total, this.difficulty === 'easy' ? 1 : total >= 4 ? 3 : 2);
+    if (ready.length < need) return;
+    const group = ready.slice(0, 4);
+    const t = this.airTarget(group[0], homeThreat);
+    if (!t) return;
+    for (const u of group) {
+      this.st(u).lastOrder = this.now;
+      u.issue({ type: 'attack', target: t }, this.world);
     }
   }
 
-  private airTarget(a: Unit): Entity | null {
+  private airTarget(a: Unit, homeOnly = false): Entity | null {
     const canHit = (e: Entity) => a.weapons.some((w) => (e.isAir ? w.def.targetsAir : w.def.targetsGround && w.def.vs[e.armor] > 0.2));
     const aaNear = (x: number, z: number) => {
       let n = 0;
@@ -2382,31 +2492,37 @@ export class SkirmishAI {
     };
     let best: Entity | null = null;
     let bs = -Infinity;
+    const aaWeight = this.difficulty === 'easy' ? 1.5 : 5;
     // defend base first
     for (const e of this.visibleEnemies) {
       if (!canHit(e)) continue;
       const home = Math.hypot(e.x - this.cx, e.z - this.cz) < this.baseR + 10;
+      if (homeOnly && !home) continue;
       let s = home ? 10 : 0;
       if (e.def.harvester) s += 6;
       if (unitInfo(e.def).role === 'artillery') s += 4;
-      s -= aaNear(e.x, e.z) * (this.P.micro ? 4 : 1.5);
+      if (e.weapons.some((w) => w.def.targetsAir)) s -= 3; // shoots back
+      s -= aaNear(e.x, e.z) * aaWeight;
       s -= Math.hypot(e.x - a.x, e.z - a.z) * 0.05;
       if (s > bs) {
         bs = s;
         best = e;
       }
     }
-    for (const b of this.knownBuildings) {
-      if (b.owner.isNeutral || b.def.wall || !canHit(b)) continue;
-      let s = b.def.power > 0 ? 3 : b.def.refinery ? 2.5 : 1;
-      s -= aaNear(b.x, b.z) * (this.P.micro ? 4 : 1.5);
-      s -= Math.hypot(b.x - a.x, b.z - a.z) * 0.05;
-      if (s > bs) {
-        bs = s;
-        best = b;
+    if (!homeOnly) {
+      for (const b of this.knownBuildings) {
+        if (b.owner.isNeutral || b.def.wall || !canHit(b)) continue;
+        let s = b.def.power > 0 ? 3 : b.def.refinery ? 2.5 : 0.5;
+        if (b.weapons.some((w) => w.def.targetsAir)) s -= 4;
+        s -= aaNear(b.x, b.z) * aaWeight;
+        s -= Math.hypot(b.x - a.x, b.z - a.z) * 0.05;
+        if (s > bs) {
+          bs = s;
+          best = b;
+        }
       }
     }
-    return bs > -6 ? best : null;
+    return bs > 0 ? best : null;
   }
 
   // ---------------------------------------------------------------- rally pool
@@ -2492,6 +2608,45 @@ export class SkirmishAI {
     } else this.lowPowerSince = -1;
     // prune old threats
     this.threats = this.threats.filter((t) => this.now - t.t < 90);
+  }
+
+  private badCells = new Map<Unit, { x: number; z: number; t: number }[]>();
+  /**
+   * Work around a harvester livelock in the sim: World.findOre picks ore by
+   * straight-line distance, so a harvester can choose a tile it cannot reach
+   * (other side of a ridge, beyond the path search budget). Its path comes back
+   * empty, it "arrives" instantly, seeks the same tile again and re-requests a
+   * path every tick. Detect that quickly and send it to a reachable field.
+   */
+  private unstickHarvesters() {
+    const m = this.world.map;
+    for (const u of this.my) {
+      if (!u.def.harvester || u.order.type !== 'harvest') continue;
+      if (u.harvState !== 'toOre' && u.harvState !== 'seek') continue;
+      if (!u.path || u.needsPath || u.harvTile < 0) continue;
+      const tx = u.harvTile % m.w, tz = Math.floor(u.harvTile / m.w);
+      if (Math.hypot(tx + 0.5 - u.x, tz + 0.5 - u.z) < 1.5) continue;
+      // unreachable: the (partial) path ends well short of the ore tile
+      const end = u.path.length ? u.path[u.path.length - 1] : { x: u.x, z: u.z };
+      if (Math.hypot(end.x - tx - 0.5, end.z - tz - 0.5) < 2.5) continue;
+      const bad = (this.badCells.get(u) ?? []).filter((b) => this.now - b.t < 90);
+      bad.push({ x: tx, z: tz, t: this.now });
+      this.badCells.set(u, bad);
+      let best: OreCell | null = null;
+      let bs = Infinity;
+      for (const c of this.oreCells) {
+        if (bad.some((b) => Math.hypot(b.x - c.x, b.z - c.z) < 6)) continue;
+        const d = this.refineryDist(c.x, c.z);
+        if (d >= 65535) continue;
+        const sc = d + Math.hypot(c.x - u.x, c.z - u.z) * 0.2 - Math.min(c.ore, 6000) / 1000;
+        if (sc < bs) {
+          bs = sc;
+          best = c;
+        }
+      }
+      if (best) u.issue({ type: 'harvest', x: best.x, z: best.z }, this.world);
+      else u.issue({ type: 'move', x: this.cx + 2, z: this.cz + 4 }, this.world); // park it; the sim retries later
+    }
   }
 
   private harvesterCare() {

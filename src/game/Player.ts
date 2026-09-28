@@ -71,6 +71,7 @@ export class Player {
   techLimit = 99;
   lastAttackAlert = -999;
   lastHarvAlert = -999;
+  lastUnitAlert = -999;
   lastLowPowerAlert = -999;
   lastFundsAlert = -999;
   /** Where attention should jump (space bar) */

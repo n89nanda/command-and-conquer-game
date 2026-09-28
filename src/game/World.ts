@@ -122,7 +122,10 @@ export class World {
 
   // ------------------------------------------------------------------ pathing
   requestPath(u: Unit) {
-    if (!this.pathQueue.includes(u)) this.pathQueue.push(u);
+    if (this.pathQueue.includes(u)) return;
+    // the human player's orders are served first so commands feel instant
+    if (u.owner.isHuman) this.pathQueue.unshift(u);
+    else this.pathQueue.push(u);
   }
 
   private processPaths() {
@@ -297,6 +300,7 @@ export class World {
     if (this.invulnerable.has(e)) return;
     e.hp -= amount;
     e.lastHitTime = this.time;
+    if (e.kind === 'building' && (e as Building).def.power > 0) this.buildingsDirty = true;
     if (attacker && attacker.owner !== e.owner) e.lastAttacker = attacker;
     this.events.emit('damaged', { entity: e, attacker: attacker ?? undefined, amount });
     // alerts
@@ -306,6 +310,11 @@ export class World {
         o.lastAttackAlert = this.time;
         o.lastAlertPos = { x: e.x, z: e.z };
         this.events.emit('announce', { player: o, text: 'Our base is under attack.', priority: 2, x: e.x, z: e.z });
+      } else if (e.kind === 'unit' && !(e as Unit).def.harvester && o.isHuman && this.time - o.lastUnitAlert > 30 && this.time - o.lastAttackAlert > 10) {
+        // only alert if the fight is off-screen-ish: throttled heavily
+        o.lastUnitAlert = this.time;
+        o.lastAlertPos = { x: e.x, z: e.z };
+        this.events.emit('unitAttacked', { unit: e as Unit, x: e.x, z: e.z });
       } else if (e.kind === 'unit' && (e as Unit).def.harvester && this.time - o.lastHarvAlert > 25) {
         o.lastHarvAlert = this.time;
         o.lastAlertPos = { x: e.x, z: e.z };
@@ -502,7 +511,7 @@ export class World {
     this.map.setBuilding(b.tx, b.tz, b.w, b.h, 0);
     this.removed.add(b);
     this.buildingsDirty = true;
-    if (!b.def.wall && b.def.cost >= 300) this.spawnSurvivors(b, 1 + (b.def.cost >= 1500 ? 1 : 0));
+    if (!b.def.wall && b.def.cost >= 1000) this.spawnSurvivors(b, 1 + (b.def.cost >= 2000 ? 1 : 0));
     this.events.emit('buildingDied', { building: b });
   }
 
@@ -704,7 +713,7 @@ export class World {
           const d = e.distTo(s.x, s.z);
           if (d > def.radius) return;
           const f = 1 - (d / def.radius) * 0.7;
-          const mult = e.kind === 'building' ? 0.9 : 1;
+          const mult = e.kind === 'building' ? ((e as Building).def.produces === 'yard' ? 0.35 : 0.5) : 1;
           this.damage(e, def.damage * f * mult, null);
         };
         this.spatial.query(s.x, s.z, def.radius + 1, apply);

@@ -59,6 +59,8 @@ export class Unit extends Entity {
   lastOreX = -1;
   lastOreZ = -1;
   harvTimer = 0;
+  harvStateTime = 0;
+  lastHarvState = '';
   dockRef: Building | null = null;
   // stealth
   revealTimer = 0;
@@ -70,6 +72,12 @@ export class Unit extends Entity {
   tag = '';
   /** Stance: aggressive units chase, holdPosition don't move to engage */
   holdFire = false;
+  /** Hold ground: engage only what is in range, never chase. */
+  holdGround = false;
+  /** Group move speed cap (slowest unit in a formation). */
+  speedCap = Infinity;
+  /** aircraft attack-move continuation */
+  resumeMove: { x: number; z: number } | null = null;
   /** push accumulation from separation */
   pushX = 0;
   pushZ = 0;
@@ -119,6 +127,8 @@ export class Unit extends Entity {
   issue(order: Order, world: World) {
     this.order = order;
     this.target = null;
+    this.speedCap = Infinity;
+    this.resumeMove = null;
     this.moveVersion++;
     this.idleTime = 0;
     switch (order.type) {
@@ -284,7 +294,7 @@ export class Unit extends Entity {
     // accelerate smoothly
     const accel = this.isInfantry ? 8 : 2.5;
     this.speedFactor += (f - this.speedFactor) * Math.min(1, accel * dt);
-    let step = this.def.speed * this.speedFactor * speedMult * dt;
+    let step = Math.min(this.def.speed, this.speedCap) * this.speedFactor * speedMult * dt;
     // slow down on final approach
     if (last && d < 0.6) step = Math.min(step, d);
     if (step > 0.0001) {
@@ -375,6 +385,7 @@ export class Unit extends Entity {
         }
       }
       this.order = { type: 'idle' };
+      this.speedCap = Infinity;
       this.guardX = this.x;
       this.guardZ = this.z;
       this.target = null;
@@ -413,8 +424,8 @@ export class Unit extends Entity {
     this.scanTimer -= dt;
     if (this.scanTimer <= 0) {
       this.scanTimer = 0.45;
-      const leash = this.isInfantry ? 4 : 6;
-      const r = Math.max(maxRange(this.weapons), this.sight * 0.85);
+      const leash = this.holdGround ? 0 : this.isInfantry ? 4 : 6;
+      const r = this.holdGround ? maxRange(this.weapons) : Math.max(maxRange(this.weapons), this.sight * 0.85);
       const t = acquireTarget(world, this, this.weapons, this.x, this.z, r);
       if (t && (!this.target || t !== this.target)) {
         if (!this.target || this.target.kind === 'building' || t.distTo(this.x, this.z) < this.target.distTo(this.x, this.z) - 1) this.target = t;
@@ -426,16 +437,24 @@ export class Unit extends Entity {
       }
     }
     if (this.target) {
+      if (this.holdGround) {
+        // stand still; shoot only if in range
+        if (this.target.distTo(this.x, this.z) <= rangeVs(this.weapons, this.target) + 0.1) this.aimAndFire(world, dt, this.target);
+        else this.target = null;
+        return;
+      }
       const done = this.engage(world, dt, this.target, true);
       if (done) {
         this.target = null;
         if (dist(this.x, this.z, this.guardX, this.guardZ) > 1.5) this.moveTo(this.guardX, this.guardZ, world);
       }
-    } else if (!this.path && !this.needsPath && this.lastAttacker && !this.lastAttacker.dead && world.time - this.lastHitTime < 2) {
+    } else if (!this.holdGround && !this.path && !this.needsPath && this.lastAttacker && !this.lastAttacker.dead && world.time - this.lastHitTime < 2) {
       // retaliate against attackers out of scan range (e.g. artillery) — move toward
       const a = this.lastAttacker;
-      if (canAnyHit(this.weapons, a) && a.distTo(this.x, this.z) < 14 && this.owner.ai) {
+      if (canAnyHit(this.weapons, a) && a.distTo(this.x, this.z) < 14 && isTargetable(world, this, a)) {
         this.target = a;
+        this.guardX = this.x;
+        this.guardZ = this.z;
       }
     }
   }
@@ -465,11 +484,29 @@ export class Unit extends Entity {
    */
   engage(world: World, dt: number, target: Entity, _auto: boolean): boolean {
     if (target.dead) return true;
-    const range = rangeVs(this.weapons, target);
-    if (range <= 0) return true;
+    // close to the range of the SHORTEST weapon that can hit, firing longer-ranged ones on the way in
+    let range = Infinity, minR = Infinity;
+    for (const w of this.weapons) {
+      if (!canWeaponHit(w.def, target)) continue;
+      range = Math.min(range, w.def.range);
+      minR = Math.min(minR, w.def.minRange ?? 0);
+    }
+    if (range === Infinity) return true;
     const d = target.distTo(this.x, this.z);
-    const minR = this.weapons[0]?.def.minRange ?? 0;
+    // crushers drive over nearby enemy infantry
+    const crushIt = this.def.crusher && target.kind === 'unit' && (target as Unit).def.crushable && d < 3 && !this.holdGround;
+    if (crushIt) {
+      this.repathTimer -= dt;
+      if ((!this.path && !this.needsPath) || this.repathTimer <= 0) {
+        this.repathTimer = 0.5;
+        this.moveTo(target.x, target.z, world);
+      }
+      this.followPath(world, dt);
+      this.aimAndFire(world, dt, target, true);
+      return false;
+    }
     if (d > range - 0.05) {
+      if (d <= rangeVs(this.weapons, target) + 0.05 && (this.def.hasTurret || this.def.flying)) this.aimAndFire(world, dt, target, true);
       // move closer
       this.repathTimer -= dt;
       const tgtMoved = dist(this.goalX, this.goalZ, target.x, target.z) > 1.5;
@@ -479,7 +516,7 @@ export class Unit extends Entity {
         else this.moveTo(target.x, target.z, world);
       }
       this.followPath(world, dt);
-      if (this.def.hasTurret) this.aimTurret(target, dt);
+      if (this.def.hasTurret && !(d <= rangeVs(this.weapons, target) + 0.05)) this.aimTurret(target, dt);
       return false;
     }
     if (d < minR && !this.isInfantry) {
@@ -501,11 +538,13 @@ export class Unit extends Entity {
     return Math.abs(angleDiff(this.turret, ang)) < 0.1;
   }
 
-  aimAndFire(world: World, dt: number, target: Entity) {
+  aimAndFire(world: World, dt: number, target: Entity, moving = false) {
     const ang = Math.atan2(target.z - this.z, target.x - this.x);
     let aimed: boolean;
     if (this.def.hasTurret) {
       aimed = this.aimTurret(target, dt);
+    } else if (moving) {
+      aimed = Math.abs(angleDiff(this.heading, ang)) < 0.3;
     } else if (this.isInfantry) {
       this.heading = rotateTowards(this.heading, ang, this.def.turnRate * dt);
       aimed = Math.abs(angleDiff(this.heading, ang)) < 0.3;
@@ -581,6 +620,21 @@ export class Unit extends Entity {
   private updateHarvest(world: World, dt: number) {
     const map = world.map;
     const cap = this.def.capacity ?? 700;
+    // watchdog: never let a harvester sit in one state forever
+    if (this.harvState !== this.lastHarvState) {
+      this.lastHarvState = this.harvState;
+      this.harvStateTime = 0;
+    }
+    this.harvStateTime += dt;
+    if ((this.harvState === 'toRefinery' && this.harvStateTime > 45) || (this.harvState === 'toOre' && this.harvStateTime > 45)) {
+      this.dockRef = null;
+      this.path = null;
+      this.harvState = this.harvState === 'toOre' ? 'seek' : 'toRefinery';
+      this.lastHarvState = '';
+    } else if (this.harvState === 'waitDock' && this.harvStateTime > 20) {
+      if (this.dockRef?.docked && this.dockRef.docked !== this) this.dockRef.docked = null;
+      this.harvState = 'toRefinery';
+    }
     switch (this.harvState) {
       case 'seek': {
         if (this.cargo >= cap) {
@@ -628,7 +682,7 @@ export class Unit extends Entity {
           return;
         }
         this.harvTimer += dt;
-        if (this.harvTimer >= 0.35) {
+        if (this.harvTimer >= 0.55) {
           this.harvTimer = 0;
           const rich = map.oreType[i] === 2;
           const take = Math.min(map.ore[i], rich ? 50 : 30, cap - this.cargo);
@@ -717,7 +771,7 @@ export class Unit extends Entity {
         r.docked = this;
         r.producing = 0.5;
         this.harvTimer += dt;
-        if (this.harvTimer >= 0.25) {
+        if (this.harvTimer >= 0.45) {
           this.harvTimer = 0;
           const amt = Math.min(this.cargo, 50);
           this.cargo -= amt;
@@ -770,7 +824,18 @@ export class Unit extends Entity {
     switch (o.type) {
       case 'move': {
         cruise();
-        // opportunistic fire at air/ground while flying (only if ammo)
+        if (o.attackMove && (this.ammo > 0 || !this.def.ammo)) {
+          this.scanTimer -= dt;
+          if (this.scanTimer <= 0) {
+            this.scanTimer = 0.4;
+            const t = acquireTarget(world, this, this.weapons, this.x, this.z, maxRange(this.weapons) + 2);
+            if (t) {
+              this.resumeMove = { x: o.x, z: o.z };
+              this.order = { type: 'attack', target: t };
+              break;
+            }
+          }
+        }
         if (flyTo(o.x, o.z, 0.3)) {
           this.order = { type: 'idle' };
           this.guardX = this.x;
@@ -782,7 +847,8 @@ export class Unit extends Entity {
         cruise();
         const t = o.target;
         if (t.dead || !isTargetable(world, this, t)) {
-          this.order = { type: 'idle' };
+          this.order = this.resumeMove ? { type: 'move', x: this.resumeMove.x, z: this.resumeMove.z, attackMove: true } : { type: 'idle' };
+          this.resumeMove = null;
           this.target = null;
           break;
         }

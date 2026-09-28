@@ -1317,3 +1317,47 @@ body.covenant .sw .bar {
     --sidebar-w: 250px;
   }
 }
+
+.selpanel .cmd.on {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, var(--accent-dim), var(--panel-2));
+  color: #fff;
+}
+.tooltip .role {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.tooltip .role .pos {
+  color: var(--good);
+}
+.tooltip .role .neg {
+  color: #ff8a6a;
+}
+.enemy-sw {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+.enemy-sw .esw {
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  min-width: 260px;
+  padding: 4px 12px;
+  background: rgba(40, 6, 4, 0.85);
+  border: 1px solid #ff4a3a;
+  color: #ff8a6a;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  font-family: var(--num-font);
+  box-shadow: 0 0 12px rgba(255, 60, 40, 0.35);
+}
