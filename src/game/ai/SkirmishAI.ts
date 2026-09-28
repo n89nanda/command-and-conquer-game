@@ -366,7 +366,7 @@ export class SkirmishAI {
     const d = UNITS[id];
     if (!r || !d) return 1;
     const prior = d.cost * 3;
-    const eff = (r.dealt * 0.7 + r.killed * 0.3 + prior) / (r.lost + prior);
+    const eff = (r.killed * 0.8 + r.dealt * 0.2 + prior) / (r.lost + prior);
     return Math.max(0.3, Math.min(2.2, eff));
   }
 
@@ -1413,6 +1413,29 @@ export class SkirmishAI {
     return this.profCache;
   }
 
+  private aaCache = { t: -999, v: 0 };
+  /** Share of the known enemy army (by value) that can shoot at aircraft, plus AA defences. */
+  private enemyAAShare(): number {
+    if (this.now - this.aaCache.t < 10) return this.aaCache.v;
+    let aa = 0, all = 0;
+    for (const sv of this.seen.values()) {
+      if (sv.unit.dead || this.now - sv.t > 240 || !sv.def.weapons.length) continue;
+      all += sv.def.cost;
+      const ui = unitInfo(sv.def);
+      const ground = Math.max(1, ui.dps.infantry, ui.dps.light, ui.dps.heavy);
+      if (ui.antiAir) aa += sv.def.cost * Math.min(1.5, ui.dps.aircraft / ground);
+    }
+    for (const b of this.knownBuildings) {
+      if (!b.weapons.length || b.owner.isNeutral) continue;
+      all += b.def.cost;
+      if (b.weapons.some((w) => w.def.targetsAir)) aa += b.def.cost * 1.5;
+    }
+    // no information yet: assume a typical army (every faction fields rocket infantry)
+    const v = all > 0 ? (aa + 600) / (all + 2000) : 0.3;
+    this.aaCache = { t: this.now, v };
+    return v;
+  }
+
   private rangeCache = { t: -999, v: 5.5 };
   /** Cost-weighted weapon range of the enemy forces we expect to fight (units and defences). */
   private enemyRange(): number {
@@ -1460,7 +1483,8 @@ export class SkirmishAI {
       let fast = 0;
       for (const u of army) if (unitInfo(u.def).fast) fast++;
       for (const it of this.player.queues.vehicles.items) if (this.kit.unit[it.defId]?.fast) fast++;
-      if (fast < 2 && this.now - this.lastHarass > 60) return scout.def.id;
+      const raidsPay = this.tradeFactor(scout.def.id) >= 0.75;
+      if (fast < 2 && raidsPay && this.now - this.lastHarass > 150) return scout.def.id;
     }
     // enemy aircraft around and too little anti-air: build some
     let enemyAir = 0;
@@ -1490,11 +1514,11 @@ export class SkirmishAI {
       // closing the distance under fire: short-ranged units pay for it
       if (ui.role !== 'aircraft') {
         const gap = Math.max(0, this.enemyRange() - ui.range);
-        s /= 1 + (0.45 * gap) / Math.max(0.8, d.speed);
+        s /= 1 + (0.7 * gap) / Math.max(0.8, d.speed);
       }
       s *= 1 + (ui.range - 5) * 0.03;
       // learn from this match: favour types that trade well, drop the ones that don't
-      if (this.difficulty !== 'easy') s *= Math.pow(this.tradeFactor(d.id), this.P.counter);
+      if (this.difficulty !== 'easy') s *= Math.pow(this.tradeFactor(d.id), this.P.counter * 1.5);
       if (d.category === 'vehicle') s *= 1.1;
       if (d.crusher) s *= 1 + prof.mix.infantry * 0.3;
       if ((d.techLevel ?? 1) >= 3) s *= 1.1;
@@ -1515,6 +1539,7 @@ export class SkirmishAI {
         if (this.opts.passive) continue;
         const r = this.perf.get(d.id);
         if (r && r.lost >= d.cost * 2 && this.tradeFactor(d.id) < 0.8) continue; // not paying off
+        if (this.enemyAAShare() > 0.25 && this.difficulty !== 'easy') continue; // they can shoot planes down
       }
       if (ui.role === 'infantry' && inf / total > 0.55) s *= 0.6;
       if (mix.aircraft > 0.05 && ui.antiAir) s *= 1.2;
@@ -2435,6 +2460,8 @@ export class SkirmishAI {
     }
     const start = this.P.earlyHarass ? 150 : 300;
     if (this.now < start || this.now - this.lastHarass < 120) return;
+    const scout = this.kit.scoutUnit;
+    if (scout && this.tradeFactor(scout.def.id) < 0.6) return; // raids keep failing: stop wasting units
     if (this.squads.some((s) => s.kind === 'harass' && s.units.length)) return;
     if (this.now - this.lastThreatT < 15) return;
     const fast = this.my.filter((u) => this.st(u).job === 'pool' && unitInfo(u.def).fast && u.hp > u.maxHp * 0.8);

@@ -18,6 +18,10 @@ interface Palette {
   fog: number;
   sun: number;
   ambient: number;
+  /** grading: tone-mapping exposure, sun & hemisphere intensities */
+  exposure: number;
+  sunI: number;
+  hemiI: number;
 }
 
 const PALETTES: Record<Theater, Palette> = {
@@ -26,28 +30,28 @@ const PALETTES: Record<Theater, Palette> = {
     dirt: [[112, 92, 64], [128, 106, 74], [96, 80, 58]],
     sand: [[170, 150, 110], [184, 164, 122]],
     rock: [[104, 98, 90], [128, 120, 108], [84, 80, 76]],
-    road: [92, 84, 72], concrete: [140, 138, 132], seabed: [60, 70, 58], water: 0x103848, sky: 0x9fb8cc, fog: 0x8aa0b0, sun: 0xfff1dc, ambient: 0x8fa6c0,
+    road: [92, 84, 72], concrete: [140, 138, 132], seabed: [60, 70, 58], water: 0x103848, sky: 0x9fb8cc, fog: 0x8aa0b0, sun: 0xfff1dc, ambient: 0x8fa6c0, exposure: 1.0, sunI: 2.6, hemiI: 1.05,
   },
   desert: {
     grass: [[176, 148, 98], [190, 160, 108], [164, 136, 90]],
     dirt: [[150, 116, 76], [138, 106, 70]],
     sand: [[206, 180, 128], [214, 190, 140]],
     rock: [[150, 112, 80], [170, 130, 92], [124, 92, 68]],
-    road: [110, 94, 76], concrete: [160, 154, 140], seabed: [120, 110, 80], water: 0x1a4a58, sky: 0xe2c9a0, fog: 0xd4b88e, sun: 0xffe2b8, ambient: 0xc0a888,
+    road: [110, 94, 76], concrete: [160, 154, 140], seabed: [120, 110, 80], water: 0x1a4a58, sky: 0xe2c9a0, fog: 0xd4b88e, sun: 0xffe2b8, ambient: 0xc0a888, exposure: 0.88, sunI: 2.2, hemiI: 0.85,
   },
   winter: {
-    grass: [[222, 228, 236], [206, 214, 226], [236, 240, 246]],
+    grass: [[196, 204, 214], [184, 193, 206], [208, 214, 222]],
     dirt: [[150, 150, 156], [128, 130, 138]],
     sand: [[190, 196, 204]],
     rock: [[96, 102, 112], [120, 126, 136], [80, 86, 96]],
-    road: [110, 110, 116], concrete: [150, 152, 158], seabed: [70, 80, 96], water: 0x163448, sky: 0xc8d6e6, fog: 0xb8c8d8, sun: 0xf2f6ff, ambient: 0xa6b8d0,
+    road: [110, 110, 116], concrete: [150, 152, 158], seabed: [70, 80, 96], water: 0x163448, sky: 0xc8d6e6, fog: 0xb8c8d8, sun: 0xdfe8ff, ambient: 0xa6b8d0, exposure: 0.74, sunI: 1.8, hemiI: 0.75,
   },
   wasteland: {
     grass: [[92, 88, 62], [104, 96, 66], [80, 78, 56]],
     dirt: [[96, 76, 60], [84, 66, 54], [110, 88, 66]],
     sand: [[140, 124, 96]],
     rock: [[78, 70, 66], [96, 86, 80], [64, 58, 56]],
-    road: [72, 66, 60], concrete: [110, 106, 100], seabed: [50, 56, 44], water: 0x223a32, sky: 0xb09a80, fog: 0x9a8670, sun: 0xffd8a8, ambient: 0x9a8a7a,
+    road: [72, 66, 60], concrete: [110, 106, 100], seabed: [50, 56, 44], water: 0x223a32, sky: 0xb09a80, fog: 0x9a8670, sun: 0xffd8a8, ambient: 0x9a8a7a, exposure: 0.98, sunI: 2.5, hemiI: 1.0,
   },
 };
 

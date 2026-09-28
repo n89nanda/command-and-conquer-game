@@ -23,6 +23,8 @@ import { SkirmishAI } from '../src/game/ai/SkirmishAI';
 import type { FactionId } from '../src/data/types';
 import type { Player } from '../src/game/Player';
 import type { World } from '../src/game/World';
+import type { Unit } from '../src/game/Unit';
+import { UNITS } from '../src/data/units';
 
 interface MatchSetup {
   mapId: string;
@@ -76,6 +78,14 @@ function seedRandom(seed: number) {
   };
 }
 
+/** Aggregated per unit type over all matches: built / killed value (by this type) / lost value. */
+const typeStats = new Map<string, { built: number; builtValue: number; killedValue: number; lostValue: number }>();
+const ts = (id: string) => {
+  let r = typeStats.get(id);
+  if (!r) typeStats.set(id, (r = { built: 0, builtValue: 0, killedValue: 0, lostValue: 0 }));
+  return r;
+};
+
 function runMatch(setup: MatchSetup): MatchResult {
   seedRandom(setup.seed);
   const spec = SKIRMISH_MAPS.find((m) => m.id === setup.mapId)!;
@@ -109,6 +119,21 @@ function runMatch(setup: MatchSetup): MatchResult {
     };
   });
   const defeatedAt = active.map(() => -1);
+  world.events.on('unitReady', (e) => {
+    const d = UNITS[e.defId];
+    if (d && !d.harvester && !d.mcv && d.weapons.length) {
+      ts(e.defId).built++;
+      ts(e.defId).builtValue += d.cost;
+    }
+  });
+  world.events.on('unitDied', (e) => {
+    if (e.unit.def.harvester || e.unit.def.mcv) return;
+    if (e.unit.def.weapons.length) ts(e.unit.def.id).lostValue += e.unit.def.cost;
+    if (e.killer && e.killer.kind === 'unit') ts((e.killer as Unit).def.id).killedValue += e.unit.def.cost;
+  });
+  world.events.on('buildingDied', (e) => {
+    if (e.killer && e.killer.kind === 'unit' && !e.building.def.wall && e.killer.owner !== e.building.owner) ts((e.killer as Unit).def.id).killedValue += e.building.def.cost * 0.5;
+  });
   const kills = { units: new Map<Player, number>() };
   void kills;
   const dt = 1 / 30;
@@ -297,5 +322,9 @@ if (results.length > 1) {
       thinks += p.ai.stats.thinks;
       slow += p.aiSlow;
     }
+  console.log('unit types (value killed incl. 50% of buildings / value built):');
+  const rows = [...typeStats.entries()].filter(([, r]) => r.built > 0).sort((a, b) => b[1].builtValue - a[1].builtValue);
+  for (const [id, r] of rows)
+    console.log(`  ${id.padEnd(10)} built ${String(r.built).padStart(5)}  value ${String(Math.round(r.builtValue / 1000)).padStart(5)}k  killed ${String(Math.round(r.killedValue / 1000)).padStart(5)}k  ratio ${(r.killedValue / Math.max(1, r.builtValue)).toFixed(2)}`);
   console.log(`AI cost per player: avg ${(ms / Math.max(1, ticks)).toFixed(4)} ms/tick, avg ${(thinkMs / Math.max(1, thinks)).toFixed(3)} ms/think, worst single tick ${maxMs.toFixed(1)} ms, ticks over 4 ms: ${slow} of ${ticks}`);
 }

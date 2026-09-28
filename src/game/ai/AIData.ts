@@ -236,7 +236,7 @@ export function fightValue(ui: UnitInfo, p: EnemyProfile, siege = 0.1): number {
   const d = ui.def;
   let att = 0;
   for (const a of ARMORS) att += (a === 'building' ? siege : p.mix[a]) * ui.dps[a];
-  att *= 1 + ui.splash * (0.4 + p.mix.infantry);
+  att *= 1 + ui.splash * 0.5 * p.mix.infantry; // splash only pays off against clumped infantry
   const arm = d.flying ? 'aircraft' : d.armor;
   return ((att * d.hp) / (p.inc[arm] + 0.002) / Math.pow(d.cost, 1.7)) * 100;
 }

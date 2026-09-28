@@ -153,7 +153,7 @@ export class GameRenderer {
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: this.quality >= 1 ? 4 : 0 });
     this.composer = new EffectComposer(this.renderer, rt);
     this.composer.addPass(new RenderPass(this.scene, this.rig.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.55, 0.5, 0.82);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.38, 0.38, 1.35);
     this.composer.addPass(this.bloom);
     this.vignette = new ShaderPass(VignetteShader);
     this.composer.addPass(this.vignette);
@@ -200,6 +200,11 @@ export class GameRenderer {
     this.hemi.color.setHex(pal.sky);
     this.hemi.groundColor.setHex(0x3a3228);
     this.sun.color.setHex(pal.sun);
+    this.sun.intensity = pal.sunI;
+    this.hemi.intensity = pal.hemiI;
+    this.renderer.toneMappingExposure = pal.exposure;
+    // outdoor sky environment for reflections (instead of the studio room)
+    this.scene.environment = makeSkyEnvironment(this.renderer, pal.sky, pal.fog, pal.sun);
     this.fow = new FogOfWar(map.w, map.h);
     this.terrain = new TerrainView(map);
     this.worldGroup.add(this.terrain.group);
@@ -305,7 +310,7 @@ export class GameRenderer {
     rig.update(dt, this.fx.shake, gy);
     // sun follows camera focus
     const tx = rig.targetX, tz = rig.targetZ;
-    this.sun.position.set(tx - 18, 32, tz - 12);
+    this.sun.position.set(tx - 24, 26, tz - 15);
     this.sun.target.position.set(tx, 0, tz);
     const shadowR = Math.max(22, rig.zoom * 1.25);
     const sc = this.sun.shadow.camera;
@@ -362,4 +367,29 @@ export class GameRenderer {
   static unitRadius(u: Unit) {
     return u.radius;
   }
+}
+
+const skyEnvCache = new Map<string, THREE.Texture>();
+/** Procedural sky-gradient environment map with a sun disc. */
+function makeSkyEnvironment(renderer: THREE.WebGLRenderer, zenith: number, horizon: number, sun: number): THREE.Texture {
+  const key = [zenith, horizon, sun].join(',');
+  const cached = skyEnvCache.get(key);
+  if (cached) return cached;
+  const scene = new THREE.Scene();
+  const geo = new THREE.SphereGeometry(10, 32, 16);
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { uZen: { value: new THREE.Color(zenith).multiplyScalar(0.9) }, uHor: { value: new THREE.Color(horizon) }, uGround: { value: new THREE.Color(0x2a2620) }, uSun: { value: new THREE.Color(sun) }, uSunDir: { value: new THREE.Vector3(-0.6, 0.65, -0.4).normalize() } },
+    vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: `uniform vec3 uZen, uHor, uGround, uSun, uSunDir; varying vec3 vDir;
+      void main(){ float h = vDir.y; vec3 c = h > 0.0 ? mix(uHor, uZen, pow(h, 0.6)) : mix(uHor, uGround, pow(-h, 0.4));
+      float s = max(dot(normalize(vDir), uSunDir), 0.0); c += uSun * (pow(s, 400.0) * 6.0 + pow(s, 12.0) * 0.25);
+      gl_FragColor = vec4(c, 1.0); }`,
+  });
+  scene.add(new THREE.Mesh(geo, mat));
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const tex = pmrem.fromScene(scene, 0.02).texture;
+  pmrem.dispose();
+  skyEnvCache.set(key, tex);
+  return tex;
 }
