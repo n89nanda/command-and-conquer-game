@@ -179,7 +179,8 @@ export class Hud {
   }
 
   setPaused(p: boolean) {
-    this.pauseEl.style.display = p ? 'block' : 'none';
+    this.pauseEl.style.display = 'none'; // the pause modal carries its own title
+    void p;
   }
 
   update(dt: number) {

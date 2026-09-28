@@ -24,6 +24,50 @@ export class Attract {
   private b: Player;
   private starts: { x: number; z: number }[];
   running = true;
+  private beatT = 0;
+  private beat = 0;
+  private focus = { x: 0, z: 0, zoom: 13, yaw: 0, follow: false };
+
+  private fightCentre(): { x: number; z: number } | null {
+    const w = this.world;
+    let best: { x: number; z: number } | null = null;
+    let bd = Infinity;
+    const mid = { x: w.map.w / 2, z: w.map.h / 2 };
+    for (const u of w.units) {
+      if (u.owner !== this.a || !u.target || u.target.dead) continue;
+      const d = Math.hypot(u.x - mid.x, u.z - mid.z);
+      if (d < bd) {
+        bd = d;
+        best = { x: (u.x + u.target.x) / 2, z: (u.z + u.target.z) / 2 };
+      }
+    }
+    return best;
+  }
+
+  private nextBeat() {
+    const w = this.world;
+    this.beatT = 13;
+    this.beat++;
+    const fight = this.fightCentre();
+    const kind = this.beat % 4;
+    const cut = (x: number, z: number, zoom: number, yaw: number, follow: boolean) => {
+      this.focus = { x, z, zoom, yaw, follow };
+      const rig = this.renderer.rig;
+      rig.targetX = x;
+      rig.targetZ = z;
+      rig.zoom = zoom + 1.5;
+      rig.yaw = yaw - 0.15;
+    };
+    if ((kind === 0 || kind === 2) && fight) cut(fight.x, fight.z, 11.5, (Math.random() - 0.5) * 0.8, true);
+    else if (kind === 1) {
+      const s = this.starts[this.beat % 2];
+      cut(s.x + (this.beat % 2 ? -2 : 2), s.z + 2, 12.5, (Math.random() - 0.5) * 0.9, false);
+    } else {
+      const h = w.units.find((u) => u.def.harvester);
+      if (h) cut(h.x, h.z, 10.5, (Math.random() - 0.5) * 0.8, false);
+      else cut(w.map.w / 2, w.map.h / 2, 13, 0, true);
+    }
+  }
 
   constructor(host: HTMLElement) {
     resetEntityIds();
@@ -113,14 +157,24 @@ export class Attract {
       this.spawnT = 14;
       if (w.units.length < 70) this.wave();
     }
-    // camera: slow cinematic drift across the battlefield
+    // camera director: cut between cinematic "beats" every ~13s
     const rig = this.renderer.rig;
-    const cx = w.map.w / 2 + Math.sin(this.t * 0.05) * w.map.w * 0.28;
-    const cz = w.map.h / 2 + Math.cos(this.t * 0.037) * 5;
-    rig.targetX += (cx - rig.targetX) * Math.min(1, dt * 0.5);
-    rig.targetZ += (cz - rig.targetZ) * Math.min(1, dt * 0.5);
-    rig.yaw = Math.sin(this.t * 0.03) * 0.35;
-    rig.zoom = 15 + Math.sin(this.t * 0.07) * 2;
+    this.beatT -= dt;
+    if (this.beatT <= 0) this.nextBeat();
+    const f = this.focus;
+    if (f.follow) {
+      // follow the centre of the current fight
+      const fight = this.fightCentre();
+      if (fight) {
+        f.x += (fight.x - f.x) * Math.min(1, dt * 0.4);
+        f.z += (fight.z - f.z) * Math.min(1, dt * 0.4);
+      }
+    }
+    rig.targetX += (f.x - rig.targetX) * Math.min(1, dt * 1.2);
+    rig.targetZ += (f.z - rig.targetZ) * Math.min(1, dt * 1.2);
+    rig.yaw += (f.yaw - rig.yaw) * Math.min(1, dt * 0.3) + dt * 0.012;
+    rig.zoom += (f.zoom - rig.zoom) * Math.min(1, dt * 0.8);
+    rig.pitch = (47 * Math.PI) / 180;
     this.renderer.render(dt, Math.min(1, this.acc * 30));
   }
 

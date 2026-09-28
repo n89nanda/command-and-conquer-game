@@ -51,9 +51,9 @@ export class EntityViews {
     this.models = models;
     this.fx = fx;
     this.extra = extra;
-    this.ringGeo = new THREE.RingGeometry(0.9, 1.0, 40);
+    this.ringGeo = new THREE.RingGeometry(0.92, 1.0, 48);
     this.ringGeo.rotateX(-Math.PI / 2);
-    const mk = (c: number) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, depthWrite: false });
+    const mk = (c: number) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending });
     this.ringMats = { own: mk(0x4dff6a), enemy: mk(0xff4040), neutral: mk(0xffd040) };
   }
 

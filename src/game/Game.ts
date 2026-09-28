@@ -147,8 +147,13 @@ export class Game {
   }
 
   focusStart() {
-    const mine = this.world.buildings.find((b) => b.owner === this.me && b.def.produces === 'yard') ?? this.world.units.find((u) => u.owner === this.me && u.def.mcv) ?? this.world.units.find((u) => u.owner === this.me);
-    if (mine) this.renderer.rig.lookAt(mine.x, mine.z + 2);
+    const yard = this.world.buildings.find((b) => b.owner === this.me && b.def.produces === 'yard');
+    if (yard) return this.renderer.rig.lookAt(yard.x, yard.z + 1.5);
+    const units = this.world.units.filter((u) => u.owner === this.me);
+    if (units.length) {
+      const c = centroid(units);
+      this.renderer.rig.lookAt(c.x, c.z + 0.5);
+    }
   }
 
   // =================================================================== loop
@@ -1127,6 +1132,8 @@ export class Game {
           [b.tx, tmp.y - (tmp.y - w.map.heightAt(b.x, b.z)), b.tz + b.h], [b.tx + b.w, w.map.heightAt(b.x, b.z), b.tz + b.h],
         ];
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        this.renderer.project(b.x, tmp.y, b.z, this.scr);
+        if (!this.scr.vis) return;
         for (const p of pts) {
           this.renderer.project(p[0], p[1], p[2], this.scr);
           minX = Math.min(minX, this.scr.x);
@@ -1172,10 +1179,6 @@ export class Game {
       const pxPerUnit = H / (this.renderer.rig.zoom * 0.62);
       const bw = Math.max(18, u.radius * 2.2 * pxPerUnit);
       const x = this.scr.x, y = this.scr.y - 6;
-      if (selected) {
-        const bh = bw * (u.isInfantry ? 1.3 : 0.8);
-        drawBrackets(ctx, x - bw / 2 - 2, y, x + bw / 2 + 2, y + bh + 6, u.owner === this.me ? '#ffffff' : '#ff8080', 5);
-      }
       drawHealth(ctx, x, y, bw, u.hp / u.maxHp, selected);
       if (u.rank > 0) drawChevrons(ctx, x + bw / 2 + 5, y + 2, u.rank);
       if (u.def.harvester && (selected || this.hoverEntity === u)) {
@@ -1397,7 +1400,7 @@ function drawHealth(ctx: CanvasRenderingContext2D, cx: number, y: number, w: num
   const x = cx - w / 2;
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
   ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
-  const col = r > 0.6 ? '#4dff5a' : r > 0.3 ? '#ffd23a' : '#ff3b30';
+  const col = r > 0.6 ? '#58e05a' : r > 0.3 ? '#f0c419' : '#e8452c';
   ctx.fillStyle = col;
   ctx.fillRect(x, y, w * Math.max(0, r), h);
   if (pips && w > 24) {
