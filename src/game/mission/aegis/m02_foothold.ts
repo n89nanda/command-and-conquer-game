@@ -50,7 +50,7 @@ class Foothold extends CampaignScript {
     this.hint('Select the <b>MCV</b> (Mobile Construction Vehicle) and press <kbd>D</kbd> to <b>deploy</b> it into a Construction Yard. Pick open, flat ground.');
 
     // MCV lost before deploying = mission over
-    this.when(() => !this.mcvDeployed && !this.units(me).some((u) => u.def.mcv) && !me.has('a_yard'), () => this.defeat('The MCV was destroyed.'));
+    this.when(() => !this.mcvDeployed && !this.units(me).some((u) => !!u.def.mcv) && !me.has('a_yard'), () => this.defeat('The MCV was destroyed.'));
     this.when(() => this.mcvDeployed, () => this.loseWhenWiped('Firebase Anvil has fallen.'));
     this.on('deployed', (e) => {
       if (e.unit.owner !== me || this.mcvDeployed) return;
@@ -98,7 +98,7 @@ class Foothold extends CampaignScript {
 
     // scripted raid on the harvester
     this.after(300, () => {
-      const harv = this.units(me, (u) => u.def.harvester)[0];
+      const harv = this.units(me, (u) => !!u.def.harvester)[0];
       if (!harv) return;
       const us = this.spawn(raiders, ['raider', 'raider'], 60, 40);
       for (const u of us) {
@@ -158,7 +158,7 @@ class Foothold extends CampaignScript {
 
   override cheatStep() {
     const me = this.me;
-    const mcv = this.units(me, (u) => u.def.mcv)[0];
+    const mcv = this.units(me, (u) => !!u.def.mcv)[0];
     if (!this.mcvDeployed && mcv) {
       if (mcv.order.type !== 'deploy') mcv.issue({ type: 'deploy' }, this.world);
       return;

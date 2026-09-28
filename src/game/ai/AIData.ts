@@ -42,6 +42,8 @@ export interface UnitInfo {
   def: UnitDef;
   role: UnitRole;
   dps: ArmorMix;
+  /** largest splash radius of its weapons */
+  splash: number;
   range: number;
   minRange: number;
   /** can shoot at aircraft */
@@ -131,6 +133,7 @@ export function getKit(faction: FactionId): FactionKit {
       def: u,
       role: classifyUnit(u),
       dps: dpsProfile(u.weapons),
+      splash: Math.max(0, ...ws.map((w) => w.splash ?? 0)),
       range,
       minRange,
       antiAir: ws.some((w) => w.targetsAir),
@@ -176,6 +179,7 @@ export function unitInfo(def: UnitDef): UnitInfo {
       def,
       role: classifyUnit(def),
       dps: dpsProfile(def.weapons),
+      splash: Math.max(0, ...def.weapons.map((w) => WEAPONS[w]?.splash ?? 0)),
       range: Math.max(0, ...def.weapons.map((w) => WEAPONS[w]?.range ?? 0)),
       minRange: 0,
       antiAir: def.weapons.some((w) => WEAPONS[w]?.targetsAir),
@@ -191,4 +195,48 @@ export function effectiveness(dps: ArmorMix, mix: ArmorMix): number {
   let s = 0;
   for (const a of ARMORS) s += dps[a] * mix[a];
   return s;
+}
+
+/**
+ * What an enemy army looks like to a unit picker:
+ *  mix – cost share of each armor class (what we must be able to kill)
+ *  inc – damage per second per credit the enemy deals to each armor class
+ *        (splash and crushing make infantry more vulnerable)
+ */
+export interface EnemyProfile {
+  mix: ArmorMix;
+  inc: ArmorMix;
+}
+
+export function buildProfile(entries: { def: UnitDef; weight: number }[]): EnemyProfile {
+  const mix = emptyMix();
+  const inc = emptyMix();
+  let tot = 0;
+  for (const e of entries) tot += e.weight;
+  if (tot <= 0) return { mix: { infantry: 0.3, light: 0.2, heavy: 0.4, building: 0.1, aircraft: 0 }, inc: { infantry: 0.03, light: 0.03, heavy: 0.03, building: 0.03, aircraft: 0.01 } };
+  for (const e of entries) {
+    const share = e.weight / tot;
+    const info = unitInfo(e.def);
+    mix[e.def.flying ? 'aircraft' : e.def.armor] += share;
+    for (const a of ARMORS) {
+      let d = info.dps[a];
+      if (a === 'infantry') d *= (1 + info.splash * 1.2) * (e.def.crusher ? 1.3 : 1);
+      inc[a] += (share * d) / e.def.cost;
+    }
+  }
+  return { mix, inc };
+}
+
+/**
+ * Lanchester-style fighting value per credit of a unit type against an enemy
+ * profile: damage it deals to the enemy mix times how long it survives the
+ * enemy's fire, divided by cost^1.7 (between linear and square law).
+ */
+export function fightValue(ui: UnitInfo, p: EnemyProfile, siege = 0.1): number {
+  const d = ui.def;
+  let att = 0;
+  for (const a of ARMORS) att += (a === 'building' ? siege : p.mix[a]) * ui.dps[a];
+  att *= 1 + ui.splash * (0.4 + p.mix.infantry);
+  const arm = d.flying ? 'aircraft' : d.armor;
+  return ((att * d.hp) / (p.inc[arm] + 0.002) / Math.pow(d.cost, 1.7)) * 100;
 }

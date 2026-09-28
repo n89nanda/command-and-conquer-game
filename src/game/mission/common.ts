@@ -5,6 +5,7 @@ import { BUILDINGS } from '../../data/buildings';
 import { UNITS } from '../../data/units';
 import type { FactionId } from '../../data/types';
 import type { Building } from '../Building';
+import type { GameEvents } from '../Events';
 import { resetEntityIds } from '../Entity';
 import { GameMap, ORE_MAX, RICH_MAX, Terrain } from '../GameMap';
 import { generateMap, type MapSpec } from '../MapGen';
@@ -448,14 +449,28 @@ export abstract class CampaignScript extends MissionScript {
   countdownLeft(): number {
     return this.cd && !this.cd.fired ? Math.max(0, this.cd.end - this.t) : 0;
   }
+  /** Push the running countdown back (e.g. a charge stalls on low power). */
+  delayCountdown(sec: number) {
+    if (this.cd && !this.cd.fired) this.cd.end += sec;
+  }
   /** Test hook: shorten the running countdown. */
   skipCountdown(to = 1) {
     if (this.cd && !this.cd.fired) this.cd.end = Math.min(this.cd.end, this.t + to);
   }
 
+  /** A guest character speaks on a radio channel (temporarily renaming that speaker). */
+  sayAs(name: string, text: string, speaker: Speaker = 'ally', delay = 0) {
+    this.after(delay, () => {
+      const prev = this.speakerNames[speaker];
+      this.speakerNames[speaker] = name;
+      this.say(text, speaker);
+      this.speakerNames[speaker] = prev;
+    });
+  }
+
   /** Subscribe to a world event for the lifetime of the mission. */
-  on<K extends Parameters<World['events']['on']>[0]>(k: K, fn: Parameters<World['events']['on']>[1] & ((e: never) => void)) {
-    this.unsubs.push(this.world.events.on(k, fn as never));
+  on<K extends keyof GameEvents>(k: K, fn: (e: GameEvents[K]) => void) {
+    this.unsubs.push(this.world.events.on(k, fn));
   }
 
   /** Idle units of `p` tagged 'hunter' (wave() does this) seek out `targets` every few seconds. */
@@ -567,7 +582,7 @@ export abstract class CampaignScript extends MissionScript {
   anyNear(p: Player, x: number, z: number, r: number, filter?: (u: Unit) => boolean) {
     return this.unitsInArea(p, x, z, r, filter).length > 0;
   }
-  alive(list: (Building | Unit)[]) {
+  alive<T extends Building | Unit>(list: T[]): T[] {
     return list.filter((e) => !e.dead);
   }
   /** Give a building to another player (used by scripted defections and the cheat pass). */
@@ -578,6 +593,33 @@ export abstract class CampaignScript extends MissionScript {
     b.target = null;
     this.world.buildingsDirty = true;
     this.world.events.emit('captured', { building: b, from, to });
+  }
+  /** Hand units over to another player (converts, defectors, allied survivors). */
+  giveUnits(units: Unit[], to: Player) {
+    for (const u of units) {
+      if (u.dead) continue;
+      u.owner = to;
+      u.tag = '';
+      u.issue({ type: 'idle' }, this.world);
+    }
+  }
+  /** Keep a player's superweapon from charging (the launch is scripted instead). */
+  holdSuperweapon(p: Player, id: 'ionStrike' | 'riftMissile') {
+    this.every(1, () => {
+      const sw = p.superweapons.get(id);
+      if (sw) {
+        sw.charge = 0;
+        sw.ready = false;
+      }
+    });
+  }
+  /** Fire a held superweapon at a point (scripted launch). */
+  fireSuperweapon(p: Player, id: 'ionStrike' | 'riftMissile', x: number, z: number): boolean {
+    const sw = p.superweapons.get(id);
+    if (!sw) return false;
+    sw.ready = true;
+    const ok = this.world.launchSuperweapon(p, id, x, z);
+    return ok;
   }
   teleport(units: Unit[], x: number, z: number) {
     units.forEach((u, i) => {

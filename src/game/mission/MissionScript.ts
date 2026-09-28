@@ -235,7 +235,10 @@ export abstract class MissionScript {
   spawn(p: Player, ids: string[], x: number, z: number, heading = Math.PI / 2, spread = 1.2): Unit[] {
     const out: Unit[] = [];
     ids.forEach((id, i) => {
-      if (!UNITS[id]) return;
+      if (!UNITS[id]) {
+        console.warn('spawn: unknown unit id', id);
+        return;
+      }
       const a = i * 2.39996;
       const r = spread * Math.sqrt(i) * 0.7;
       const np = this.world.map.nearestPassable(x + Math.cos(a) * r, z + Math.sin(a) * r, 8);

@@ -112,13 +112,13 @@ export class Briefing {
         const pulse = 0.6 + Math.sin(t * 4) * 0.4;
         for (const b of world.buildings) {
           if (b.owner.isNeutral) continue;
-          const friendly = b.owner.isHuman;
+          const friendly = b.owner.isHuman || (!!world.human && !b.owner.isEnemyOf(world.human));
           ctx.fillStyle = friendly ? `rgba(90,255,140,${0.8})` : `rgba(255,80,60,${0.5 + pulse * 0.5})`;
           ctx.fillRect(ox + b.tx * s, oy + b.tz * s, b.w * s, b.h * s);
         }
         for (const u of world.units) {
           if (u.owner.isNeutral) continue;
-          const friendly = u.owner.isHuman;
+          const friendly = u.owner.isHuman || (!!world.human && !u.owner.isEnemyOf(world.human));
           if (!friendly && t < 3) continue;
           ctx.fillStyle = friendly ? '#5dff8a' : `rgba(255,90,70,${pulse})`;
           ctx.beginPath();

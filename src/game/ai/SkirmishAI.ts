@@ -19,7 +19,7 @@ import type { Player } from '../Player';
 import type { Difficulty } from '../Scenario';
 import type { Unit } from '../Unit';
 import type { World } from '../World';
-import { effectiveness, emptyMix, getKit, unitInfo, type ArmorMix, type BuildingRole, type FactionKit, type UnitInfo } from './AIData';
+import { buildProfile, effectiveness, emptyMix, fightValue, getKit, unitInfo, type ArmorMix, type BuildingRole, type EnemyProfile, type FactionKit, type UnitInfo } from './AIData';
 import { BasePlanner } from './BasePlanner';
 
 export interface SkirmishAIOptions {
@@ -33,9 +33,11 @@ export interface SkirmishAIOptions {
   passive?: boolean;
   /** seconds before the first attack wave (overrides the difficulty default) */
   attackDelay?: number;
+  /** advanced: override individual difficulty parameters (tuning / scripted missions) */
+  tuning?: Partial<AITuning>;
 }
 
-interface DiffParams {
+export interface AITuning {
   think: number;
   firstAttack: number;
   minAttackGap: number;
@@ -70,7 +72,7 @@ interface DiffParams {
   armyCap: number;
 }
 
-const PARAMS: Record<Difficulty, DiffParams> = {
+const PARAMS: Record<Difficulty, AITuning> = {
   easy: {
     think: 1.0, firstAttack: 540, minAttackGap: 150, waveMin: 4, waveGrowth: 1, waveMax: 10,
     harvPerRef: 1, maxRefineries: 2, maxDefenses: 2, micro: false, retreatHp: 0, squadRetreat: 0,
@@ -86,7 +88,7 @@ const PARAMS: Record<Difficulty, DiffParams> = {
     techTime: 660, swTime: 1080, repairBelow: 0.7, reinforce: true, focusFire: false, armyCap: 45,
   },
   hard: {
-    think: 0.4, firstAttack: 240, minAttackGap: 75, waveMin: 7, waveGrowth: 2, waveMax: 24,
+    think: 0.4, firstAttack: 270, minAttackGap: 75, waveMin: 9, waveGrowth: 2, waveMax: 26,
     harvPerRef: 2, maxRefineries: 4, maxDefenses: 6, micro: true, retreatHp: 0.3, squadRetreat: 0.35,
     counter: 0.9, incomeBonus: 0, cheatBase: true, mistakes: 0, buildDelay: [0.2, 0.8], armyQueue: 2, prodPause: 0,
     maxAircraft: 4, harass: true, earlyHarass: false, engineers: 3, expand: true, sellDying: true,
@@ -137,6 +139,9 @@ interface Squad {
   lastEngageT: number;
   /** reinforcement group heading to join this squad */
   join: Squad | null;
+  /** has gathered outside the target area once (stageT < 0: not yet) */
+  staged: boolean;
+  stageT: number;
 }
 
 interface SeenUnit {
@@ -171,7 +176,7 @@ export class SkirmishAI {
   readonly world: World;
   readonly player: Player;
   readonly difficulty: Difficulty;
-  readonly P: DiffParams;
+  readonly P: AITuning;
   readonly kit: FactionKit;
   readonly opts: SkirmishAIOptions;
   readonly planner: BasePlanner;
@@ -261,7 +266,7 @@ export class SkirmishAI {
     this.world = world;
     this.player = player;
     this.difficulty = difficulty;
-    this.P = PARAMS[difficulty] ?? PARAMS.normal;
+    this.P = { ...(PARAMS[difficulty] ?? PARAMS.normal), ...(opts.tuning ?? {}) };
     this.opts = opts;
     this.kit = getKit(player.faction);
     this.planner = new BasePlanner(world, player);
@@ -864,7 +869,8 @@ export class SkirmishAI {
 
   private wantedHarvesters(refs: number): number {
     const early = this.now < 150 ? 0 : 1;
-    return Math.min(10, Math.max(refs, Math.round(refs * this.P.harvPerRef) - (this.difficulty === 'normal' ? 1 - early : 0)));
+    const per = this.isBehind() ? Math.min(this.P.harvPerRef, 1.5) : this.P.harvPerRef;
+    return Math.min(10, Math.max(refs, Math.round(refs * per) - (this.difficulty === 'normal' ? 1 - early : 0)));
   }
 
   /** Projected power balance once everything placed / in production is finished. */
@@ -926,8 +932,9 @@ export class SkirmishAI {
     const refs = has('refinery');
     const harv = this.harvesterCount();
     // more refineries while there is ore to take
+    const behind = this.isBehind();
     const yards = this.myBuildings.filter((b) => b.def.produces === 'yard').length;
-    if (refs < this.P.maxRefineries + Math.max(0, yards - 1) && harv >= this.wantedHarvesters(refs) - 1 && (credits > 1500 || this.now > 420) && this.now > 200) {
+    if (!behind && refs < this.P.maxRefineries + Math.max(0, yards - 1) && harv >= this.wantedHarvesters(refs) - 1 && (credits > 1500 || this.now > 420) && this.now > 200) {
       if (this.refinerySiteOk()) {
         const r = pick(kit.byRole.refinery);
         if (r) return r;
@@ -971,6 +978,11 @@ export class SkirmishAI {
     if (credits > 4500 && has('barracks') < 2 && this.now > 480) {
       const f = pick(kit.byRole.barracks);
       if (f) return f;
+    }
+    if (behind && credits < 3000) {
+      // out-numbered: only keep the power up, spend the rest on the army
+      if (power && margin < 30 && this.canBuild(power.id)) return power;
+      return null;
     }
     if (!has('tech') && this.now > this.P.techTime) {
       const f = pick(kit.byRole.tech);
@@ -1273,6 +1285,7 @@ export class SkirmishAI {
     const refs = this.myBuildings.filter((b) => b.def.refinery).length;
     if (refs > 0 && this.harvesterCount() < this.wantedHarvesters(refs)) reserve += 700;
     if (this.now < 90) reserve += 1500; // opening: economy first
+    if (this.isBehind()) reserve *= 0.3; // out-numbered: army first
     const credits = p.credits;
     const rich = credits > 3000;
     // share of infantry in the army: once vehicles are available keep it moderate
@@ -1300,8 +1313,34 @@ export class SkirmishAI {
     }
   }
 
+  private profCache: EnemyProfile | null = null;
+  private profTime = -999;
+  /** Enemy army profile: what we have seen, blended with the enemy factions' basic line-up. */
+  private enemyProfile(): EnemyProfile {
+    if (this.profCache && this.now - this.profTime < 5) return this.profCache;
+    const entries: { def: UnitDef; weight: number }[] = [];
+    let seenTotal = 0;
+    for (const sv of this.seen.values()) {
+      if (sv.unit.dead || this.now - sv.t > 180) continue;
+      if (sv.def.harvester || sv.def.mcv || sv.def.weapons.length === 0) continue;
+      entries.push({ def: sv.def, weight: sv.def.cost });
+      seenTotal += sv.def.cost;
+    }
+    const w = this.P.counter * Math.min(1, seenTotal / 4000);
+    // prior: the enemy factions' basic combat units, equal cost share
+    const prior: UnitDef[] = [];
+    for (const e of this.enemies) for (const ui of getKit(e.faction).combatUnits) if ((ui.def.techLevel ?? 1) <= 2 && ui.role !== 'aircraft') prior.push(ui.def);
+    const pw = prior.length ? ((1 - w) * Math.max(seenTotal, 1)) / Math.max(w, 0.0001) / prior.length : 0;
+    if (w <= 0.0001) entries.length = 0;
+    for (const d of prior) entries.push({ def: d, weight: w <= 0.0001 ? 1 : pw });
+    this.profCache = buildProfile(entries);
+    this.profTime = this.now;
+    return this.profCache;
+  }
+
   private chooseUnit(tab: BuildTab, army: Unit[]): string | null {
     const mix = this.enemyMix();
+    const prof = this.enemyProfile();
     const counts = new Map<string, number>();
     let arty = 0, air = 0, inf = 0;
     for (const u of army) {
@@ -1347,17 +1386,15 @@ export class SkirmishAI {
         if (best && this.rand() < 0.7) return best.def.id;
       }
     }
-    const opts: { id: string; s: number }[] = [];
+    const all: { id: string; s: number; tab: BuildTab }[] = [];
     for (const ui of this.kit.combatUnits) {
       const d = ui.def;
-      if (d.tab !== tab) continue;
       if (!this.canBuild(d.id)) continue;
-      let s = (effectiveness(ui.dps, mix) * Math.sqrt(d.hp)) / d.cost;
+      let s = fightValue(ui, prof, mix.building);
       s *= 1 + (ui.range - 5) * 0.05;
-      if (d.category === 'vehicle') s *= 1.3;
-      if (d.crushable) s *= 0.85;
-      if (d.crusher) s *= 1 + mix.infantry * 0.8;
-      if ((d.techLevel ?? 1) >= 3) s *= 1.15;
+      if (d.category === 'vehicle') s *= 1.1;
+      if (d.crusher) s *= 1 + prof.mix.infantry * 0.3;
+      if ((d.techLevel ?? 1) >= 3) s *= 1.1;
       if (d.stealth) s *= 1.1;
       if (d.selfHeal) s *= 1.1;
       const share = (counts.get(d.id) ?? 0) / total;
@@ -1372,9 +1409,15 @@ export class SkirmishAI {
       }
       if (ui.role === 'infantry' && inf / total > 0.55) s *= 0.6;
       if (mix.aircraft > 0.05 && ui.antiAir) s *= 1.2;
-      opts.push({ id: d.id, s });
+      all.push({ id: d.id, s, tab: d.tab });
     }
+    const opts = all.filter((o) => o.tab === tab);
     if (opts.length === 0) return null;
+    // this production line only makes poor units right now: save the money for the others
+    let bestAll = 0;
+    for (const o of all) bestAll = Math.max(bestAll, o.s);
+    const bestHere = Math.max(...opts.map((o) => o.s));
+    if (bestHere < bestAll * 0.4 && this.player.credits < 2500 && this.difficulty !== 'easy') return null;
     if (this.rand() < this.P.mistakes) return opts[Math.floor(this.rand() * opts.length)].id;
     // weighted pick among the best few (keeps variety)
     opts.sort((a, b) => b.s - a.s);
@@ -1658,6 +1701,24 @@ export class SkirmishAI {
   }
 
   /** Value of the enemy army we know about (seen recently and not known dead). */
+  private behindCache = { t: -999, v: false };
+  /** Are we clearly out-numbered by the enemy army we know about? Then army first, economy later. */
+  private isBehind(): boolean {
+    if (this.now - this.behindCache.t < 3) return this.behindCache.v;
+    let est = 0;
+    for (const sv of this.seen.values()) {
+      if (sv.unit.dead || this.now - sv.t > 180) continue;
+      if (sv.def.harvester || sv.def.mcv || sv.def.weapons.length === 0) continue;
+      est += sv.def.cost;
+    }
+    let own = 0;
+    for (const u of this.my) if (this.isCombat(u) || u.def.flying) own += u.def.cost;
+    for (const t of ['infantry', 'vehicles', 'aircraft'] as BuildTab[]) for (const it of this.player.queues[t].items) if (!UNITS[it.defId].harvester) own += UNITS[it.defId].cost * 0.5;
+    const v = this.now > 150 && est > own * 1.15 + 500;
+    this.behindCache = { t: this.now, v };
+    return v;
+  }
+
   private enemyArmyEstimate(): number {
     let v = 0;
     for (const s of this.seen.values()) {
@@ -1665,6 +1726,14 @@ export class SkirmishAI {
       if (s.def.harvester || s.def.mcv || s.def.weapons.length === 0) continue;
       v += s.def.cost;
     }
+    // no recent sighting: assume the enemy has built an army comparable to ours
+    if (v === 0 && this.now > 150) {
+      let own = 0;
+      for (const u of this.my) if (this.isCombat(u)) own += u.def.cost;
+      v = own * (this.difficulty === 'normal' ? 0.5 : 0.75);
+    }
+    // static defences we know about count too (they fight at full strength at home)
+    for (const b of this.knownBuildings) if (b.weapons.length && !b.owner.isNeutral && !(b.def.needsPower && b.owner.lowPower)) v += b.def.cost * 0.8;
     return v;
   }
 
@@ -1698,7 +1767,7 @@ export class SkirmishAI {
     if (pool.length < want && pool.length < cap) return;
     if (pool.length === 0) return;
     // don't suicide into a much bigger army we have seen (normal+)
-    const ratio = this.difficulty === 'easy' ? 0 : this.difficulty === 'normal' ? 0.8 : this.difficulty === 'hard' ? 1.0 : 0.9;
+    const ratio = this.difficulty === 'easy' ? 0 : this.difficulty === 'normal' ? 0.8 : this.difficulty === 'hard' ? 1.2 : 1.1;
     const poolV = pool.reduce((a, u) => a + this.value(u), 0);
     const est = this.enemyArmyEstimate();
     const waited = this.now - Math.max(this.lastAttackT, this.firstAttackTime());
@@ -1724,6 +1793,7 @@ export class SkirmishAI {
       id: squadIds++, kind, units: [...units], state: 'advance', objective: null, objX: c.x, objZ: c.z, path: [], wp: 0,
       startValue: units.reduce((a, u) => a + this.value(u), 0), created: this.now, regroupT: -999,
       lastCx: c.x, lastCz: c.z, progressT: this.now, fightX: 0, fightZ: 0, lastEngageT: -999, join,
+      staged: kind === 'harass' || !!join || this.difficulty === 'easy' || units.length < 4, stageT: -1,
     };
     for (const u of units) {
       this.setJob(u, kind === 'harass' ? 'harass' : 'squad');
@@ -1850,26 +1920,35 @@ export class SkirmishAI {
       }
     }
     if (best) return { entity: best, x: best.x, z: best.z };
+    if (this.P.cheatBase) {
+      const u = this.nearestEnemyUnit(fx, fz);
+      if (u) return { entity: u.isAir ? null : u, x: u.x, z: u.z };
+    }
     // nothing known: explore likely start spots, then hunt the least recently seen areas
     if (this.candidates.length) return { entity: null, x: this.candidates[0].x, z: this.candidates[0].z };
     let seenUnit: SeenUnit | null = null;
     for (const s of this.seen.values()) if (!s.unit.dead && !s.def.flying && (!seenUnit || s.t > seenUnit.t)) seenUnit = s;
     if (seenUnit && this.now - seenUnit.t < 30) return { entity: null, x: seenUnit.x, z: seenUnit.z };
     // stalemate breaker: late in the game go straight for whatever the enemy has left
-    if (this.P.cheatBase || this.now > 1500) {
-      let bu: Unit | null = null;
-      let bd = Infinity;
-      for (const u of this.world.units) {
-        if (u.dead || !u.owner.isEnemyOf(this.player)) continue;
-        const d = Math.hypot(u.x - fx, u.z - fz) + (u.isAir ? 30 : 0);
-        if (d < bd) {
-          bd = d;
-          bu = u;
-        }
-      }
-      if (bu) return { entity: bu.isAir ? null : bu, x: bu.x, z: bu.z };
+    if (this.now > 1500) {
+      const u = this.nearestEnemyUnit(fx, fz);
+      if (u) return { entity: u.isAir ? null : u, x: u.x, z: u.z };
     }
     return this.huntPoint(fx, fz);
+  }
+
+  private nearestEnemyUnit(fx: number, fz: number): Unit | null {
+    let bu: Unit | null = null;
+    let bd = Infinity;
+    for (const u of this.world.units) {
+      if (u.dead || !u.owner.isEnemyOf(this.player)) continue;
+      const d = Math.hypot(u.x - fx, u.z - fz) + (u.isAir ? 30 : 0);
+      if (d < bd) {
+        bd = d;
+        bu = u;
+      }
+    }
+    return bu;
   }
 
   private huntPoint(fx: number, fz: number): { entity: Entity | null; x: number; z: number } {
@@ -1929,6 +2008,7 @@ export class SkirmishAI {
   }
 
   private updateSquad(sq: Squad) {
+    // (staging: before the final approach the whole group gathers so it hits at once)
     const c = this.centroid(sq.units);
     if (!c) return;
     const now = this.now;
@@ -2004,6 +2084,15 @@ export class SkirmishAI {
             continue;
           }
         }
+        // Units on attack-move keep shooting a building even while enemy units
+        // hit them (Unit.updateMove never re-evaluates its target): switch them.
+        if (u.target && !u.target.dead && u.target.kind === 'building' && !(u.target as Building).weapons.length) {
+          const threat = this.nearestThreat(u);
+          if (threat) {
+            this.orderAttack(u, threat, 1.5);
+            continue;
+          }
+        }
         if (u.target && !u.target.dead) continue;
         this.orderMove(u, sq.fightX, sq.fightZ, true, 2);
       }
@@ -2038,6 +2127,25 @@ export class SkirmishAI {
     }
     while (sq.wp < sq.path.length - 1 && Math.hypot(sq.path[sq.wp].x - c.x, sq.path[sq.wp].z - c.z) < 4.5) sq.wp++;
     const wp = sq.path[Math.min(sq.wp, sq.path.length - 1)];
+    if (!sq.staged) {
+      const end = sq.path[sq.path.length - 1];
+      let enemyClose = false;
+      for (const e of this.visibleEnemies) if (e.weapons.length && Math.abs(e.x - c.x) < 17 && Math.abs(e.z - c.z) < 17 && Math.hypot(e.x - c.x, e.z - c.z) < 17) enemyClose = true;
+      const nearTarget = Math.hypot(end.x - c.x, end.z - c.z) < 22 || enemyClose || this.dangerAt(wp.x, wp.z, 10) > 0;
+      if (nearTarget) {
+        if (sq.stageT < 0) {
+          sq.stageT = now;
+          this.say(`squad ${sq.id} stages before the assault`);
+        }
+        let far = 0;
+        for (const u of sq.units) if (Math.hypot(u.x - c.x, u.z - c.z) > 5) far++;
+        if (far / sq.units.length > 0.15 && now - sq.stageT < 18) {
+          for (const u of sq.units) if (Math.hypot(u.x - c.x, u.z - c.z) > 3) this.orderMove(u, c.x, c.z, true, 3);
+          return;
+        }
+        sq.staged = true;
+      }
+    }
     const atEnd = sq.wp >= sq.path.length - 1 && Math.hypot(wp.x - c.x, wp.z - c.z) < 5;
     if (atEnd) {
       if (sq.objective && !sq.objective.dead) {
@@ -2051,15 +2159,44 @@ export class SkirmishAI {
       if (sq.kind === 'harass' && !sq.objective) this.retarget(sq, c.x, c.z);
       return;
     }
-    // lead units wait for the pack: those far ahead toward the waypoint get held at the centroid
+    // lead units wait for the pack: fast units that get well ahead of the group hold position
+    const cwp = Math.hypot(wp.x - c.x, wp.z - c.z);
     for (const u of sq.units) {
       const art = unitInfo(u.def).role === 'artillery';
       if (art) {
         this.orderMove(u, wp.x + back.x * 3, wp.z + back.z * 3, true, 3);
         continue;
       }
+      const ahead = cwp - Math.hypot(wp.x - u.x, wp.z - u.z);
+      if (ahead > 5 && sq.kind === 'attack' && this.difficulty !== 'easy') {
+        if (u.order.type === 'move' && !u.target) {
+          const st = this.st(u);
+          if (this.now - st.lastOrder > 1) {
+            st.lastOrder = this.now;
+            u.issue({ type: 'idle' }, this.world);
+          }
+        }
+        continue;
+      }
       this.orderMove(u, wp.x, wp.z, true, 2.5);
     }
+  }
+
+  /** Closest armed enemy (unit or defence) within this unit's reach. */
+  private nearestThreat(u: Unit): Entity | null {
+    const r = Math.max(...u.weapons.map((w) => w.def.range)) + 2.5;
+    let best: Entity | null = null;
+    let bd = Infinity;
+    for (const e of this.visibleEnemies) {
+      if (!e.weapons.length) continue;
+      if (!u.weapons.some((w) => (e.isAir ? w.def.targetsAir : w.def.targetsGround && w.def.vs[e.armor] > 0.2))) continue;
+      const d = e.distTo(u.x, u.z);
+      if (d < r && d < bd) {
+        bd = d;
+        best = e;
+      }
+    }
+    return best;
   }
 
   private pickFocus(cx: number, cz: number, units: Unit[]): Entity | null {
@@ -2095,17 +2232,48 @@ export class SkirmishAI {
   }
 
   // ---------------------------------------------------------------- scouting
+  private lastScoutT = -999;
   private scouting() {
+    // look at the enemy army shortly before an attack when our information is stale (normal+)
+    if (!this.opts.passive && this.difficulty !== 'easy' && this.now - this.lastScoutT > 90) {
+      const soon = this.firstAttackTime() - this.now < 45 || (this.waves > 0 && this.now - this.lastAttackT > this.P.minAttackGap * 0.6);
+      let fresh = false;
+      for (const sv of this.seen.values()) if (!sv.unit.dead && sv.def.weapons.length && this.now - sv.t < 60) fresh = true;
+      const eb = this.enemyBasePos(this.cx, this.cz);
+      if (soon && !fresh && eb && !this.my.some((u) => this.st(u).job === 'scout')) {
+        const cand = this.my
+          .filter((u) => this.st(u).job === 'pool' && this.isCombat(u) && u.hp > u.maxHp * 0.7)
+          .sort((a, b) => b.def.speed - a.def.speed)[0];
+        if (cand) {
+          this.setJob(cand, 'scout');
+          this.st(cand).spot = { x: eb.x, z: eb.z };
+          this.lastScoutT = this.now;
+          this.say(`sends a ${cand.def.name} to scout the enemy`);
+        }
+      }
+    }
     for (const u of this.my) {
       const s = this.st(u);
       if (s.job !== 'scout') continue;
       if (u.hp < u.maxHp * 0.5 || this.now - s.since > 240) {
+        s.spot = null;
         this.setJob(u, 'pool');
+        continue;
+      }
+      if (s.spot) {
+        // pre-attack look: done once it sees enemy combat units or reaches the spot
+        let sawArmy = false;
+        for (const e of this.visibleEnemies) if (e.weapons.length && Math.hypot(e.x - u.x, e.z - u.z) < u.def.sight + 1) sawArmy = true;
+        if (sawArmy || Math.hypot(u.x - s.spot.x, u.z - s.spot.z) < 6) {
+          s.spot = null;
+          this.setJob(u, 'pool');
+          continue;
+        }
+        this.orderMove(u, s.spot.x, s.spot.z, false, 3);
         continue;
       }
       const target = this.candidates[0];
       if (!target) {
-        // done exploring: hard+ keeps it for harassment, others join the army
         this.setJob(u, 'pool');
         continue;
       }

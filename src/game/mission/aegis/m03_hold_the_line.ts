@@ -76,7 +76,7 @@ class HoldTheLine extends CampaignScript {
       this.wave(strike, ['scorpion', 'scorpion', 'scorpion', 'acolyte', 'acolyte', 'acolyte', 'acolyte'], C, to);
     });
     this.after(240, () => {
-      const harv = this.units(me, (u) => u.def.harvester)[0];
+      const harv = this.units(me, (u) => !!u.def.harvester)[0];
       this.say('Raiders on the eastern ice. They are going for the harvester.', 'intel');
       const us = this.wave(strike, ['raider', 'raider', 'raider', 'seeker', 'seeker'], E, to);
       if (harv) for (const u of us.slice(0, 3)) u.issue({ type: 'attack', target: harv }, this.world);

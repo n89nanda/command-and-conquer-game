@@ -142,6 +142,7 @@ class FirstLight extends CampaignScript {
   }
 
   outpostDown() {
+    this.objective('outpost', 'Destroy the Covenant outpost across the Kessel river.');
     this.complete('outpost');
     this.hint(null);
     const { me, cov } = this.refs;

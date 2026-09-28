@@ -6,6 +6,9 @@
 //   --diff=normal,hard      difficulties per player (cycled)
 //   --fac=aegis,covenant    factions per player (cycled)
 //   --batch                 run every map x faction pairing x difficulty pairing
+//     --pairs=normal:normal,easy:hard   difficulty pairings (default normal:normal,easy:hard,hard:hard)
+//     --mirror | --allfac   same-faction pairings only | mixed and mirror pairings
+//   --seed=N                deterministic run (each batch match uses seed N, N+1, ...)
 //   --n=2                   repeats per configuration (batch mode)
 //   --credits=5000
 //   --quiet                 no timeline, only results
@@ -46,7 +49,7 @@ interface MatchResult {
   final: string[];
 }
 
-const args = process.argv.slice(2);
+const args = (globalThis as unknown as { process: { argv: string[] } }).process.argv.slice(2);
 const flag = (name: string) => args.find((a) => a.startsWith('--' + name + '='))?.split('=')[1];
 const has = (name: string) => args.includes('--' + name);
 const pos = args.filter((a) => !a.startsWith('--'));
@@ -166,9 +169,9 @@ function runMatch(setup: MatchSetup): MatchResult {
           // stuck-state heuristics
           if (world.time > 240) {
             if (p.stats.creditsSpent - lastSpent[i] < 50 && p.credits > 2000) stuck.push(`${fmt(world.time)} ${p.name} not spending (cr ${Math.round(p.credits)}) ${ais[i].debugState()}`);
-            if (harv > 0 && p.stats.creditsHarvested - lastHarvested[i] < 50 && world.map.totalOre() > 20000) {
+            const refs = blds.filter((b) => b.def.refinery && b.constructing >= 1).length;
+            if (harv > 0 && refs > 0 && p.stats.creditsHarvested - lastHarvested[i] < 50 && world.map.totalOre() > 20000) {
               const hs = units.filter((u) => u.def.harvester).map((h) => `${h.order.type}/${h.harvState}@${h.x.toFixed(0)},${h.z.toFixed(0)} c${Math.round(h.cargo)}`);
-              const refs = blds.filter((b) => b.def.refinery).length;
               stuck.push(`${fmt(world.time)} ${p.name} harvesters not delivering (refineries ${refs}): ${hs.join(' | ')}`);
             }
           }
@@ -229,7 +232,7 @@ if (has('batch')) {
   const facPairs: FactionId[][] = [['aegis', 'covenant'], ['covenant', 'aegis'], ['aegis', 'aegis'], ['covenant', 'covenant']];
   for (const mapId of maps)
     for (const dp of diffPairs)
-      for (const fp of facPairs.slice(0, dp[0] === dp[1] ? 2 : 2))
+      for (const fp of has('mirror') ? facPairs.slice(2) : has('allfac') ? facPairs : facPairs.slice(0, 2))
         for (let r = 0; r < reps; r++) {
           const res = runMatch({ mapId, factions: fp, diffs: dp, minutes, credits, quiet: true, log: false, seed: seed++ });
           results.push(res);
