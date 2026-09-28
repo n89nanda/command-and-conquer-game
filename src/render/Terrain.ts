@@ -275,10 +275,65 @@ export class TerrainView {
   private buildWater(pal: Palette) {
     const map = this.map;
     const { w, h } = map;
-    // baked depth below the water surface at every height vertex: v = (depth + 0.25) / 1.25
-    const dd = new Uint8Array((w + 1) * (h + 1));
-    for (let i = 0; i < dd.length; i++) dd[i] = clamp(((WATER_LEVEL - map.heights[i] + 0.25) / 1.25) * 255, 0, 255);
-    const depthTex = new THREE.DataTexture(dd, w + 1, h + 1, THREE.RedFormat, THREE.UnsignedByteType);
+    // baked at 4px/tile: R = depth below the surface ((d + 0.25) / 1.25), G = signed distance into
+    // the water body in tiles ((sd + 1) / 3), blurred so the shoreline contour is organic, not tile-shaped
+    const Q = 4, W4 = w * Q, H4 = h * Q, N4 = W4 * H4;
+    const sd = new Float32Array(N4);
+    const BIG = 1e5;
+    for (let j = 0; j < H4; j++)
+      for (let i = 0; i < W4; i++) sd[j * W4 + i] = map.terrain[((j / Q) | 0) * w + ((i / Q) | 0)] === Terrain.Water ? BIG : -BIG;
+    // two-sided chamfer: positive distance to land inside water, negative distance to water on land
+    const chamfer = (sign: number) => {
+      const d = new Float32Array(N4);
+      for (let k = 0; k < N4; k++) d[k] = sd[k] * sign > 0 ? BIG : 0;
+      const pass = (j0: number, j1: number, dj: number, i0: number, i1: number, di: number) => {
+        for (let j = j0; j !== j1; j += dj)
+          for (let i = i0; i !== i1; i += di) {
+            const k = j * W4 + i;
+            if (!d[k]) continue;
+            let v = d[k];
+            const pi = i - di, pj = j - dj;
+            if (pi >= 0 && pi < W4) v = Math.min(v, d[k - di] + 1);
+            if (pj >= 0 && pj < H4) {
+              v = Math.min(v, d[k - dj * W4] + 1);
+              if (pi >= 0 && pi < W4) v = Math.min(v, d[k - dj * W4 - di] + 1.414);
+              const qi = i + di;
+              if (qi >= 0 && qi < W4) v = Math.min(v, d[k - dj * W4 + di] + 1.414);
+            }
+            d[k] = v;
+          }
+      };
+      pass(0, H4, 1, 0, W4, 1);
+      pass(H4 - 1, -1, -1, W4 - 1, -1, -1);
+      return d;
+    };
+    const dIn = chamfer(1), dOut = chamfer(-1);
+    for (let k = 0; k < N4; k++) sd[k] = Math.min(dIn[k], 4 * Q) - Math.min(dOut[k], 4 * Q);
+    // separable box blur (radius 2px, twice) rounds the tile corners
+    const tmp = new Float32Array(N4);
+    for (let it = 0; it < 2; it++) {
+      for (let j = 0; j < H4; j++)
+        for (let i = 0; i < W4; i++) {
+          let a = 0;
+          for (let o = -2; o <= 2; o++) a += sd[j * W4 + Math.min(W4 - 1, Math.max(0, i + o))];
+          tmp[j * W4 + i] = a / 5;
+        }
+      for (let j = 0; j < H4; j++)
+        for (let i = 0; i < W4; i++) {
+          let a = 0;
+          for (let o = -2; o <= 2; o++) a += tmp[Math.min(H4 - 1, Math.max(0, j + o)) * W4 + i];
+          sd[j * W4 + i] = a / 5;
+        }
+    }
+    const dd = new Uint8Array(N4 * 2);
+    for (let j = 0; j < H4; j++)
+      for (let i = 0; i < W4; i++) {
+        const k = j * W4 + i;
+        const depth = WATER_LEVEL - map.heightAt((i + 0.5) / Q, (j + 0.5) / Q);
+        dd[k * 2] = clamp(((depth + 0.25) / 1.25) * 255, 0, 255);
+        dd[k * 2 + 1] = clamp(((sd[k] / Q + 1) / 3) * 255, 0, 255);
+      }
+    const depthTex = new THREE.DataTexture(dd, W4, H4, THREE.RGFormat, THREE.UnsignedByteType);
     depthTex.magFilter = depthTex.minFilter = THREE.LinearFilter;
     depthTex.needsUpdate = true;
     const nrm = makeWaterTexture();
@@ -326,19 +381,22 @@ export class TerrainView {
           `#include <map_fragment>
         {
           vec2 p = vWPos.xz;
-          float depth = texture2D(uDepthTex, (p + 0.5) / (uMapSize + 1.0)).r * 1.25 - 0.25;
-          if (depth < -0.03) discard;
+          vec2 dt = texture2D(uDepthTex, p / uMapSize).rg;
+          float depth = dt.r * 1.25 - 0.25;
           float n1 = texture2D(uWaterTex, p * 0.11 + uTime * vec2(0.012, 0.008)).a;
           float n2 = texture2D(uWaterTex, p * 0.53 - uTime * vec2(0.021, 0.034)).a;
+          // organic shoreline: distance into the water body, pushed around by noise
+          float e = dt.g * 3.0 - 1.0 - 0.44 + (n1 - 0.5) * 0.5 + (n2 - 0.5) * 0.12;
+          if (e < 0.0 || depth < -0.02) discard;
           float dj = max(depth, 0.0) + (n1 - 0.5) * 0.07;
-          vec3 col = mix(uShallow, uDeep, smoothstep(0.03, 0.6, dj));
-          float a = mix(0.55, 0.95, smoothstep(0.0, 0.5, dj));
-          // shore foam: a noisy band plus waves rolling in toward the beach
-          float band = 1.0 - smoothstep(0.015, 0.18, dj);
-          float waves = sin(dj * 44.0 - uTime * 1.7 + n1 * 9.0) * 0.5 + 0.5;
-          wFoam = clamp(band * smoothstep(0.45, 0.85, waves * 0.55 + n2 * 0.65) + (1.0 - smoothstep(0.0, 0.05, dj)) * 0.75 * n2, 0.0, 1.0);
+          vec3 col = mix(uShallow, uDeep, smoothstep(0.03, 0.6, min(dj, e * 0.8)));
+          float a = mix(0.55, 0.95, smoothstep(0.0, 0.5, min(dj, e)));
+          // shore foam: a noisy band along the edge plus waves rolling in toward the beach
+          float band = 1.0 - smoothstep(0.02, 0.3, e);
+          float waves = sin(e * 20.0 - uTime * 1.7 + n1 * 7.0) * 0.5 + 0.5;
+          wFoam = clamp(band * smoothstep(0.45, 0.85, waves * 0.55 + n2 * 0.65) + (1.0 - smoothstep(0.0, 0.07, e)) * (0.45 + 0.5 * n2), 0.0, 1.0);
           col = mix(col, uFoam, wFoam * 0.9);
-          a = mix(a, 1.0, wFoam * 0.8) * smoothstep(-0.03, 0.01, depth);
+          a = mix(a, 1.0, wFoam * 0.8) * smoothstep(0.0, 0.035, e);
           diffuseColor = vec4(col, a);
         }`,
         )
@@ -469,6 +527,7 @@ export class TerrainView {
             occ += Math.max(0, gh(gi + dx * 2, gj + dz * 2) - y - 0.12) / (r1 * 2);
           }
           ao = Math.max(0.5, 1 / (1 + occ * 0.07)) * clamp(1 + y * 0.04, 0.92, 1.06);
+          if (y < WATER_LEVEL) ao = 0.4 + ao * 0.6; // the water shader already handles depth
         } else ao = 0.55 * Math.pow(Math.max(0, 1 - d / SKIRT), 1.5);
         col[k * 3] = col[k * 3 + 1] = col[k * 3 + 2] = ao;
       }
@@ -511,6 +570,8 @@ export class TerrainView {
     const tileW = new Float32Array(w * h * 4);
     const road = new Float32Array(w * h);
     const cliffRGB: RGB = [(pal.cliff >> 16) & 255, (pal.cliff >> 8) & 255, pal.cliff & 255];
+    // under water tiles: darkened wet sand (the shoreline sits inside the water tiles, so this shows)
+    const wetSand: RGB = [pal.sand[0][0] * 0.8 + pal.seabed[0] * 0.2, pal.sand[0][1] * 0.8 + pal.seabed[1] * 0.2, pal.sand[0][2] * 0.78 + pal.seabed[2] * 0.2];
     for (let z = 0; z < h; z++)
       for (let x = 0; x < w; x++) {
         const i = z * w + x;
@@ -522,7 +583,7 @@ export class TerrainView {
           case Terrain.Dirt: c = pick(pal.dirt); wi = 1; break;
           case Terrain.Sand: c = pick(pal.sand); wi = 2; break;
           case Terrain.Rock: c = cliffRGB; wi = 3; break;
-          case Terrain.Water: c = pal.seabed; wi = 2; break;
+          case Terrain.Water: c = wetSand; wi = 2; break;
           case Terrain.Road: c = pick(pal.dirt); wi = 1; road[i] = 1; break;
           case Terrain.Concrete: c = pal.concrete; wi = -1; break;
           default: c = pick(pal.grass);
@@ -812,7 +873,7 @@ function makeDetailTexture(theater: Theater) {
       const ph = (y / S) * 18 + (x / S) * 2 + warp;
       const f = ph - Math.floor(ph);
       const ripple = f < 0.7 ? f / 0.7 : (1 - f) / 0.3;
-      B[y * S + x] = ripple * 0.4 * (0.5 + tileNoise(x, y, S, 4, 45)) + tileNoise(x, y, S, 128, 43) * 0.3 + tileNoise(x, y, S, 32, 44) * 0.22;
+      B[y * S + x] = ripple * 0.3 * (0.4 + tileNoise(x, y, S, 4, 45)) + tileNoise(x, y, S, 128, 43) * 0.3 + tileNoise(x, y, S, 32, 44) * 0.22;
     }
   normalise(B);
   // A: rock grain + cracks

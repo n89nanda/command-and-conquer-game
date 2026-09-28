@@ -651,6 +651,8 @@ export class Effects {
   private seqs: Seq[] = [];
   private flashMesh: THREE.Mesh;
   private flashU: { uColor: THREE.IUniform<THREE.Color> };
+  private flashMulMesh: THREE.Mesh;
+  private flashMulU: { uColor: THREE.IUniform<THREE.Color> };
   private missileMesh: THREE.Group | null = null;
   private frameDt = 1 / 60;
   shake = 0;
@@ -698,23 +700,31 @@ export class Effects {
     for (let i = 0; i < 12; i++) this.rings.push(mkDecal(0, true, 9));
     for (let i = 0; i < 3; i++) this.markers.push(mkDecal(1, false, 13));
     // full-screen flash overlay (additive, capped)
+    // full-screen flash = exposure boost (multiplicative) + a brief additive white-out; both capped
+    const mkFlash = (u: { uColor: THREE.IUniform<THREE.Color> }, mul: boolean, order: number) => {
+      const m = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.ShaderMaterial({
+          uniforms: u,
+          vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+          fragmentShader: 'uniform vec3 uColor; varying vec2 vUv; void main(){ vec2 d = vUv - 0.5; float v = 1.0 - dot(d, d) * 1.2; gl_FragColor = vec4(uColor * v, 1.0); }',
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
+          blending: mul ? THREE.CustomBlending : THREE.AdditiveBlending,
+          ...(mul ? { blendEquation: THREE.AddEquation, blendSrc: THREE.DstColorFactor, blendDst: THREE.OneFactor } : {}),
+        }),
+      );
+      m.frustumCulled = false;
+      m.renderOrder = order;
+      m.visible = false;
+      this.group.add(m);
+      return m;
+    };
     this.flashU = { uColor: { value: new THREE.Color(0, 0, 0) } };
-    this.flashMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(2, 2),
-      new THREE.ShaderMaterial({
-        uniforms: this.flashU,
-        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-        fragmentShader: 'uniform vec3 uColor; varying vec2 vUv; void main(){ vec2 d = vUv - 0.5; float v = 1.0 - dot(d, d) * 1.2; gl_FragColor = vec4(uColor * v, 1.0); }',
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    );
-    this.flashMesh.frustumCulled = false;
-    this.flashMesh.renderOrder = 999;
-    this.flashMesh.visible = false;
-    this.group.add(this.flashMesh);
+    this.flashMulU = { uColor: { value: new THREE.Color(0, 0, 0) } };
+    this.flashMulMesh = mkFlash(this.flashMulU, true, 998);
+    this.flashMesh = mkFlash(this.flashU, false, 999);
   }
 
   setViewport(heightPx: number, fovDeg: number) {
@@ -797,11 +807,13 @@ export class Effects {
     if (this.flash > 0.002) {
       this.flash *= Math.exp(-dt * 3.2);
       const f = Math.min(0.6, this.flash);
-      this.flashU.uColor.value.copy(this.flashColor).multiplyScalar(f);
-      this.flashMesh.visible = true;
+      // exposure boost up to ~2x, plus an additive white-out that dies off much faster (f^3)
+      this.flashMulU.uColor.value.copy(this.flashColor).multiplyScalar(f * 1.8);
+      this.flashU.uColor.value.copy(this.flashColor).multiplyScalar(Math.min(0.35, f * f * f * 1.6));
+      this.flashMesh.visible = this.flashMulMesh.visible = true;
     } else {
       this.flash = 0;
-      this.flashMesh.visible = false;
+      this.flashMesh.visible = this.flashMulMesh.visible = false;
     }
     this.shake = Math.max(0, this.shake - dt * 2.5);
   }
@@ -1293,7 +1305,7 @@ export class Effects {
           const c = Math.cos(ph) * 0.12, s = Math.sin(ph) * 0.12;
           const px = ax + (bx - ax) * t + ux * c + vx * s, py = ay + (by - ay) * t + uy * c + vy * s, pz = az + (bz - az) * t + uz * c + vz * s;
           this.add.spawn({ x: px, y: py, z: pz, vx: (ux * c + vx * s) * 2, vy: (uy * c + vy * s) * 2 + 0.1, vz: (uz * c + vz * s) * 2, life: 0.45 + Math.random() * 0.25, size: 0.13, size1: 0.04, r: 1, g: 1.8, b: 3.6, a: 0.8, a1: 0, drag: 2, tex: TEX.spark });
-          if (i % 2 === 0) this.alpha.spawn({ x: px, y: py, z: pz, vx: rs() * 0.2, vy: 0.15, vz: rs() * 0.2, life: 1.3 + Math.random() * 0.6, size: 0.18, size1: 0.8, r: 0.72, g: 0.76, b: 0.82, a: 0.32, a1: 0, drag: 1, se: 1.8, fadeIn: 0.05, tex: pick(TEX.smoke, TEX.smoke2), vrot: rs() });
+          this.alpha.spawn({ x: px, y: py, z: pz, vx: rs() * 0.2, vy: 0.15, vz: rs() * 0.2, life: 1.3 + Math.random() * 0.6, size: 0.22, size1: 0.75, r: 0.72, g: 0.76, b: 0.82, a: 0.24, a1: 0, drag: 1, se: 1.8, fadeIn: 0.05, tex: pick(TEX.smoke, TEX.smoke2), vrot: rs() });
         }
         this.flashLight(bx, by + 0.4, bz, 0x80b0ff, 5, 0.2, 5);
         break;
@@ -1442,7 +1454,7 @@ export class Effects {
       d.u.uK.value = k;
       const s = R * (1.15 - 0.3 * k);
       d.m.scale.set(s, 1, s);
-      (d.u.uColor.value as THREE.Color).setRGB(0.12 + k * 0.25, 0.42 + k * 0.4, 1.3 + k * 1.0);
+      (d.u.uColor.value as THREE.Color).setRGB(0.05 + k * 0.15, 0.3 + k * 0.35, 1.2 + k * 1.0);
       d.u.uAlpha.value = Math.min(1, t * 8) * (k >= 1 ? Math.max(0, 1 - (t * (dur + 0.35) - dur) / 0.35) : 0.75);
     });
     let arcT = 0;
@@ -1477,7 +1489,7 @@ export class Effects {
   }
 
   ionImpact(x: number, y: number, z: number) {
-    this.screenFlash(0.28, 0.6, 0.8, 1.0);
+    this.screenFlash(0.4, 0.6, 0.8, 1.0);
     // HDR column: outer glow, bright body, white-hot core
     this.beam(x, y + 60, z, x, y, z, 3.4, 0.5, 1.0, 3.0, 1.1, 1, 0.4, { fp: 1.6 });
     this.beam(x, y + 60, z, x, y, z, 1.3, 2.4, 3.6, 7, 0.85, 1, 0.12, { fp: 1.4 });
@@ -1630,7 +1642,7 @@ export class Effects {
 
   nukeImpact(x: number, y: number, z: number) {
     const q = this.quality >= 2 ? 1 : 0.6;
-    this.screenFlash(0.55, 1.0, 0.85, 0.7);
+    this.screenFlash(0.6, 1.0, 0.85, 0.7);
     if (this.missileMesh) this.missileMesh.visible = false;
     // HDR fireball
     this.add.spawn({ x, y: y + 1, z, life: 0.4, size: 8, size1: 11, r: 5, g: 3.6, b: 2.2, a: 0.55, a1: 0, tex: TEX.glow, ce: 0.5 });
@@ -1675,33 +1687,27 @@ export class Effects {
         tex: pick(TEX.smoke, TEX.smoke2), vrot: rs() * 0.4,
       });
     });
-    // cap: toroidal billow at the top of the stem, fire-lit underside, violet rim
+    // cap: compact billowing dome/torus at the top of the stem, with a thin glowing violet Rift rim
     this.later(0.35, () => {
-      this.emit(3.4, (k) => 30 * (1 - k * 0.5) * q, (k) => {
-        const a = Math.random() * Math.PI * 2, r0 = 1.2 + Math.random() * 1.6 + k * 1.2;
-        const sp = 1.2 + Math.random() * 1.8;
-        const v = 0.11 + Math.random() * 0.05;
+      this.emit(3.4, (k) => 26 * (1 - k * 0.5) * q, (k) => {
+        const dome = Math.random() < 0.3;
+        const a = Math.random() * Math.PI * 2;
+        const r0 = dome ? Math.random() * 1.2 : 1.1 + Math.random() * 0.8 + k * 1.0;
+        const sp = dome ? 0.25 : 0.5 + Math.random() * 0.8;
+        const v = 0.1 + Math.random() * 0.05;
         this.alpha.spawn({
-          x: x + Math.cos(a) * r0, y: y + 5.6 + Math.random() * 1.2 + k * 0.8, z: z + Math.sin(a) * r0,
-          vx: Math.cos(a) * sp, vy: 0.35 + Math.random() * 0.3, vz: Math.sin(a) * sp,
-          life: 6 + Math.random() * 1.8, size: 2.0, size1: 4.2, r: v, g: v * 0.85, b: v * 0.85, r1: 0.32, g1: 0.3, b1: 0.31, a: 0.82, a1: 0, ae: 1.6, se: 1.5, drag: 0.75, fadeIn: 0.05,
+          x: x + Math.cos(a) * r0, y: y + 5.8 + (dome ? 0.8 : 0) + Math.random() * 0.6 + k * 0.6, z: z + Math.sin(a) * r0,
+          vx: Math.cos(a) * sp, vy: 0.25 + Math.random() * 0.2, vz: Math.sin(a) * sp,
+          life: 6 + Math.random() * 1.6, size: 1.8, size1: 3.6, r: v, g: v * 0.88, b: v * 0.9, r1: 0.3, g1: 0.28, b1: 0.3, a: 0.85, a1: 0, ae: 1.6, se: 1.5, drag: 0.6, fadeIn: 0.05,
           tex: pick(TEX.smoke, TEX.smoke2), vrot: rs() * 0.3,
         });
-        if (k < 0.4 && Math.random() < 0.3) {
-          // fire glowing inside the cap
-          this.add.spawn({
-            x: x + Math.cos(a) * r0 * 0.7, y: y + 5.4 + Math.random(), z: z + Math.sin(a) * r0 * 0.7, vx: Math.cos(a) * sp * 0.7, vy: 0.4, vz: Math.sin(a) * sp * 0.7,
-            life: 0.9 + Math.random() * 0.5, size: 1.8, size1: 0.8, r: 3, g: 1.1, b: 0.3, r1: 0.5, g1: 0.08, b1: 0.02, a: 0.3, a1: 0, ce: 0.6, drag: 0.8, tex: pick(TEX.flame, TEX.flame2), vrot: rs(),
-          });
-        }
-        if (Math.random() < 0.4) {
-          // violet Rift rim
-          const rr = r0 + 1.1 + k * 1.2;
-          this.add.spawn({
-            x: x + Math.cos(a) * rr, y: y + 5.8 + Math.random() * 0.8 + k * 0.6, z: z + Math.sin(a) * rr, vx: Math.cos(a) * sp * 0.9, vy: 0.3, vz: Math.sin(a) * sp * 0.9,
-            life: 1.2 + Math.random() * 0.8, size: 1.3, size1: 2.2, r: 1.5, g: 0.3, b: 2.6, r1: 0.4, g1: 0.05, b1: 0.8, a: 0.2, a1: 0, drag: 0.8, tex: pick(TEX.smoke, TEX.smoke2), vrot: rs() * 0.5, fadeIn: 0.15,
-          });
-        }
+      });
+      this.emit(3.0, (k) => 36 * (1 - k * 0.6) * q, (k) => {
+        const a = Math.random() * Math.PI * 2, rr = 2.5 + k * 1.6 + Math.random() * 0.3;
+        this.add.spawn({
+          x: x + Math.cos(a) * rr, y: y + 6 + Math.random() * 0.5 + k * 0.6, z: z + Math.sin(a) * rr, vx: Math.cos(a) * 0.45, vy: 0.2, vz: Math.sin(a) * 0.45,
+          life: 1 + Math.random() * 0.5, size: 0.8, size1: 1.3, r: 1.3, g: 0.25, b: 2.4, r1: 0.5, g1: 0.05, b1: 1.0, a: 0.22, a1: 0, fadeIn: 0.25, tex: TEX.glow,
+        });
       });
     });
     // violet Rift arcs crackling through the cloud
