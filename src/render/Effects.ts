@@ -89,7 +89,7 @@ function makeAtlas(): THREE.CanvasTexture {
       const n2 = fbm(u * 11 + oy, v * 11 + ox, 3);
       const d = (1 - r / 0.4) * 1.35 + (n - 0.5) * 1.25 + (n2 - 0.5) * 0.35;
       const a = smooth(0.05, 0.62, d) * 0.96;
-      const shade = 0.58 + 0.42 * Math.max(0, Math.min(1, (n - 0.32) * 1.7 - v * 0.5));
+      const shade = 0.5 + 0.5 * Math.max(0, Math.min(1, (n - 0.32) * 1.6 + (n2 - 0.5) * 0.8 - v * 0.5));
       return [shade, a];
     });
   smokeCell(TEX.smoke, 3.1, 7.7);
@@ -100,10 +100,11 @@ function makeAtlas(): THREE.CanvasTexture {
   const flameCell = (idx: number, ox: number, oy: number) =>
     cell(idx, (u, v, r) => {
       const w = fbm(u * 3 + ox, v * 3 + oy, 3);
-      const n = fbm(u * 6.5 + w * 2.4 + ox, v * 6.5 - w * 2.4 + oy, 4);
-      let heat = (1 - r / 0.4) * 1.15 + (n - 0.5) * 1.5;
-      heat = Math.max(0, Math.min(1, heat * 1.3));
-      return [0.3 + 0.7 * heat * heat, smooth(0.03, 0.5, heat)];
+      const n = fbm(u * 6.5 + w * 2.4 + ox, v * 6.5 - w * 2.4 + oy, 5);
+      const n2 = fbm(u * 15 + ox * 2, v * 15 + oy, 3);
+      let heat = (1 - r / 0.4) * 0.95 + (n - 0.5) * 1.7 + (n2 - 0.5) * 0.55;
+      heat = Math.max(0, Math.min(1, heat));
+      return [0.08 + 0.92 * Math.pow(heat, 2.2), smooth(0.0, 0.6, heat)];
     });
   flameCell(TEX.flame, 5.5, 1.2);
   flameCell(TEX.flame2, 12.8, 9.1);
@@ -921,8 +922,8 @@ export class Effects {
   fire(x: number, y: number, z: number, size: number, life: number, heat = 1) {
     this.add.spawn({
       x, y, z, vx: rs() * 0.4, vy: 0.8 + Math.random() * 0.6, vz: rs() * 0.4,
-      life, size, size1: size * 0.35, r: 2.6 * heat, g: 1.1 * heat, b: 0.28 * heat, r1: 0.5, g1: 0.1, b1: 0.02, a: 0.55, a1: 0, tex: pick(TEX.flame, TEX.flame2),
-      vrot: rs() * 3, drag: 0.8, ce: 0.7, flick: 0.25,
+      life, size, size1: size * 0.35, r: 2.6 * heat, g: 1.1 * heat, b: 0.28 * heat, r1: 0.4, g1: 0.05, b1: 0.0, a: 0.55, a1: 0, tex: pick(TEX.flame, TEX.flame2),
+      vrot: rs() * 3, drag: 0.8, ce: 0.55, flick: 0.25,
     });
   }
 
@@ -1031,10 +1032,14 @@ export class Effects {
       this.add.spawn({
         x: x + Math.cos(a) * 0.3 * s * Math.random(), y: fy + (0.1 + Math.random() * 0.3) * s, z: z + Math.sin(a) * 0.3 * s * Math.random(),
         vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp * 0.7 + 0.9 * s, vz: Math.sin(a) * Math.cos(e) * sp,
-        life: (0.42 + Math.random() * 0.38) * (0.75 + 0.25 * s), size: (0.95 + Math.random() * 0.55) * s, size1: 0.4 * s,
-        r: 3.0, g: 1.3, b: 0.35, r1: 0.6, g1: 0.12, b1: 0.02, a: 0.4, a1: 0, ce: 0.6, ae: 1.2,
+        life: (0.36 + Math.random() * 0.32) * (0.75 + 0.25 * s), size: (1.1 + Math.random() * 0.6) * s, size1: 0.35 * s, se: 1.6,
+        r: 3.0, g: 1.3, b: 0.35, r1: 0.35, g1: 0.04, b1: 0.0, a: 0.44, a1: 0, ce: 0.45, ae: 0.85,
         tex: pick(TEX.flame, TEX.flame2), drag: 3.2, vrot: rs() * 4,
       });
+    }
+    // hot core: a few small white-yellow glows that sit in the centre for the first instants
+    for (let i = 0; i < 3; i++) {
+      this.add.spawn({ x: x + rs() * 0.3 * s, y: fy + (0.2 + Math.random() * 0.3) * s, z: z + rs() * 0.3 * s, vy: 0.6 * s, life: 0.18 + Math.random() * 0.12, size: 0.8 * s, size1: 0.3 * s, r: 5, g: 3.2, b: 1.4, r1: 2.5, g1: 0.8, b1: 0.15, a: 0.45, a1: 0, tex: TEX.glow });
     }
     // 4. sparks / embers
     const floor = g;
@@ -1401,6 +1406,9 @@ export class Effects {
    */
   damageFx(x: number, y: number, z: number, level: number) {
     if (level <= 0 || this.visibility(x, z) < 0.3) return;
+    // damage emitters are continuous; thin them out on lower quality or when the pools are busy
+    const q = this.q;
+    if (q < 1 && Math.random() > q + 0.2) return;
     const x0 = x + rs() * 0.25, z0 = z + rs() * 0.25;
     if (level >= 2) {
       // black smoke column
@@ -1489,7 +1497,7 @@ export class Effects {
   }
 
   ionImpact(x: number, y: number, z: number) {
-    this.screenFlash(0.4, 0.6, 0.8, 1.0);
+    this.screenFlash(0.3, 0.6, 0.8, 1.0);
     // HDR column: outer glow, bright body, white-hot core
     this.beam(x, y + 60, z, x, y, z, 3.4, 0.5, 1.0, 3.0, 1.1, 1, 0.4, { fp: 1.6 });
     this.beam(x, y + 60, z, x, y, z, 1.3, 2.4, 3.6, 7, 0.85, 1, 0.12, { fp: 1.4 });
@@ -1576,7 +1584,7 @@ export class Effects {
     this.marker(2, tx, ty, tz, R, dur + 0.1, (d, dt, t) => {
       const k = t;
       d.u.uTime.value += dt * (0.8 + k * k * 3.5);
-      (d.u.uColor.value as THREE.Color).setRGB(1.8, 0.1, 0.06);
+      (d.u.uColor.value as THREE.Color).setRGB(1.1, 0.05, 0.035);
       d.u.uAlpha.value = Math.min(1, t * 10) * (0.3 + 0.35 * k);
     });
     // launch plume at the silo
@@ -1661,7 +1669,7 @@ export class Effects {
       const a = Math.random() * Math.PI * 2, r0 = Math.random() * (1 + k * 1.5);
       this.add.spawn({
         x: x + Math.cos(a) * r0, y: hgt + rs(), z: z + Math.sin(a) * r0, vx: Math.cos(a) * 0.8, vy: 1.5, vz: Math.sin(a) * 0.8,
-        life: 0.8 + Math.random() * 0.5, size: 2.2 - k * 0.6, size1: 0.8, r: 3.6 - k * 1.2, g: 1.5 - k * 0.6, b: 0.4, r1: 0.6, g1: 0.1, b1: 0.03, a: 0.45, a1: 0, ce: 0.6, drag: 1,
+        life: 0.7 + Math.random() * 0.4, size: 2.2 - k * 0.6, size1: 0.7, r: 3.6 - k * 1.2, g: 1.5 - k * 0.6, b: 0.4, r1: 0.45, g1: 0.05, b1: 0.01, a: 0.45 * (1 - k * 0.5), a1: 0, ce: 0.5, drag: 1,
         tex: pick(TEX.flame, TEX.flame2), vrot: rs() * 2,
       });
     });
@@ -1702,12 +1710,15 @@ export class Effects {
           tex: pick(TEX.smoke, TEX.smoke2), vrot: rs() * 0.3,
         });
       });
-      this.emit(3.0, (k) => 36 * (1 - k * 0.6) * q, (k) => {
-        const a = Math.random() * Math.PI * 2, rr = 2.5 + k * 1.6 + Math.random() * 0.3;
-        this.add.spawn({
-          x: x + Math.cos(a) * rr, y: y + 6 + Math.random() * 0.5 + k * 0.6, z: z + Math.sin(a) * rr, vx: Math.cos(a) * 0.45, vy: 0.2, vz: Math.sin(a) * 0.45,
-          life: 1 + Math.random() * 0.5, size: 0.8, size1: 1.3, r: 1.3, g: 0.25, b: 2.4, r1: 0.5, g1: 0.05, b1: 1.0, a: 0.22, a1: 0, fadeIn: 0.25, tex: TEX.glow,
+      this.emit(3.0, (k) => 16 * (1 - k * 0.6) * q, (k) => {
+        const a = Math.random() * Math.PI * 2, rr = 2.4 + k * 1.6 + Math.random() * 0.3;
+        const px = x + Math.cos(a) * rr, py = y + 6 + Math.random() * 0.5 + k * 0.6, pz = z + Math.sin(a) * rr;
+        this.alpha.spawn({
+          x: px, y: py, z: pz, vx: Math.cos(a) * 0.45, vy: 0.2, vz: Math.sin(a) * 0.45,
+          life: 3 + Math.random(), size: 1.3, size1: 2.6, r: 0.3, g: 0.1, b: 0.44, r1: 0.22, g1: 0.17, b1: 0.27, a: 0.42, a1: 0, ae: 1.4, fadeIn: 0.15, drag: 0.4,
+          tex: pick(TEX.smoke, TEX.smoke2), vrot: rs() * 0.3,
         });
+        if (Math.random() < 0.5) this.add.spawn({ x: px, y: py, z: pz, vx: Math.cos(a) * 0.45, vy: 0.2, vz: Math.sin(a) * 0.45, life: 1.2, size: 1.6, size1: 2.2, r: 1.1, g: 0.2, b: 2.2, a: 0.1, a1: 0, fadeIn: 0.3, tex: TEX.glow });
       });
     });
     // violet Rift arcs crackling through the cloud

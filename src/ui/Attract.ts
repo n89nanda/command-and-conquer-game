@@ -69,7 +69,12 @@ export class Attract {
     }
   }
 
-  constructor(host: HTMLElement) {
+  /** Frame-time probe: called once with the average frame time (ms) of ~60 frames after warm-up. */
+  onProbe: ((avgMs: number) => void) | null = null;
+  private probeN = 0;
+  private probeSum = 0;
+
+  constructor(host: HTMLElement, quality: 0 | 1 | 2 = 2) {
     resetEntityIds();
     const gen = generateMap(SPEC);
     const neutral = new Player(0, 'Civ', 'aegis', 0xaaaaaa, -1, false, 0, true);
@@ -104,6 +109,7 @@ export class Attract {
     }
     this.renderer = new GameRenderer(host, models, doodadParts, { husk, rubble });
     this.renderer.attachWorld(w);
+    if (quality !== 2) this.renderer.setQuality(quality);
     this.renderer.rig.zoom = 15;
     this.renderer.rig.lookAt(w.map.w / 2, w.map.h / 2);
     // pre-simulate a little so there's action immediately
@@ -116,6 +122,14 @@ export class Attract {
       let dt = (t - this.last) / 1000;
       this.last = t;
       if (dt < 0) dt = 0;
+      if (this.onProbe && document.visibilityState === 'visible') {
+        this.probeN++;
+        if (this.probeN > 20) this.probeSum += dt;
+        if (this.probeN === 80) {
+          this.onProbe((this.probeSum / 60) * 1000);
+          this.onProbe = null;
+        }
+      }
       if (dt > 0.1) dt = 0.1;
       this.frame(dt);
     };
@@ -124,6 +138,10 @@ export class Attract {
   }
 
   private onResize = () => this.renderer.resize();
+
+  setQuality(q: 0 | 1 | 2) {
+    if (this.renderer.quality !== q) this.renderer.setQuality(q);
+  }
 
   private wave() {
     const w = this.world;

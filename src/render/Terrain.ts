@@ -76,7 +76,7 @@ const PALETTES: Record<Theater, Palette> = {
     dirt: [[134, 132, 136], [118, 118, 126]],
     sand: [[176, 184, 194]],
     rock: [[104, 114, 128], [120, 128, 140], [90, 98, 112]],
-    road: [112, 112, 118], concrete: [150, 152, 158], seabed: [74, 84, 100], water: 0x163448, sky: 0xc8d6e6, fog: 0xb8c8d8, sun: 0xdfe8ff, ambient: 0xa6b8d0, exposure: 0.74, sunI: 1.8, hemiI: 0.75,
+    road: [86, 88, 96], concrete: [150, 152, 158], seabed: [74, 84, 100], water: 0x163448, sky: 0xc8d6e6, fog: 0xb8c8d8, sun: 0xdfe8ff, ambient: 0xa6b8d0, exposure: 0.74, sunI: 1.8, hemiI: 0.75,
     cliff: 0x687484, rockTop: 0xd8e0ea, shallow: 0x4a8a98, deep: 0x0c2438,
     det: [
       [[0.86, 0.88, 0.93], [1.1, 1.1, 1.08]],
@@ -600,7 +600,17 @@ export class TerrainView {
     for (let z = 0; z < h; z++)
       for (let x = 0; x < w; x++) {
         if (!road[z * w + x]) continue;
-        for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) roadNear[cl(z + dz, h) * w + cl(x + dx, w)] = 1;
+        for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) roadNear[cl(z + dz, h) * w + cl(x + dx, w)] = 1;
+      }
+    // blurred road field (1-2-1 kernel) so diagonal tile staircases become smooth bands
+    const roadB = new Float32Array(w * h);
+    for (let z = 0; z < h; z++)
+      for (let x = 0; x < w; x++) {
+        if (!roadNear[z * w + x]) continue;
+        let a = 0;
+        for (let dz = -1; dz <= 1; dz++)
+          for (let dx = -1; dx <= 1; dx++) a += road[cl(z + dz, h) * w + cl(x + dx, w)] * (dx ? 1 : 2) * (dz ? 1 : 2);
+        roadB[z * w + x] = a / 16;
       }
     // precomputed value-noise lattices (much cheaper per pixel than hashing)
     const LA = new Lattice(0.9, 3, w, h), LB = new Lattice(0.9, 4, w, h), LC = new Lattice(2.6, 5, w, h), LD = new Lattice(2.6, 6, w, h);
@@ -633,18 +643,18 @@ export class TerrainView {
         g *= m * (1 + n1 * 0.06);
         b *= m * (1 - hue * 0.3);
         // roads: crisp edges, darker shoulders, ruts and gravel speckle
-        const rx = fx - 0.5 + ox * 0.16, rz = fz - 0.5 + oz * 0.16;
+        const rx = fx - 0.5 + ox * 0.2, rz = fz - 0.5 + oz * 0.2;
         const rx0 = Math.floor(rx), rz0 = Math.floor(rz);
         const rtx = rx - rx0, rtz = rz - rz0;
         const rk = !roadNear[(fz | 0) * w + (fx | 0)] ? 0 :
-          (road[cl(rz0, h) * w + cl(rx0, w)] * (1 - rtx) + road[cl(rz0, h) * w + cl(rx0 + 1, w)] * rtx) * (1 - rtz) +
-          (road[cl(rz0 + 1, h) * w + cl(rx0, w)] * (1 - rtx) + road[cl(rz0 + 1, h) * w + cl(rx0 + 1, w)] * rtx) * rtz;
+          (roadB[cl(rz0, h) * w + cl(rx0, w)] * (1 - rtx) + roadB[cl(rz0, h) * w + cl(rx0 + 1, w)] * rtx) * (1 - rtz) +
+          (roadB[cl(rz0 + 1, h) * w + cl(rx0, w)] * (1 - rtx) + roadB[cl(rz0 + 1, h) * w + cl(rx0 + 1, w)] * rtx) * rtz;
         if (rk > 0.2) {
-          const mask = clamp((rk - 0.44) / 0.1, 0, 1);
-          const shoulder = clamp((rk - 0.22) / 0.2, 0, 1) * (1 - mask);
+          const mask = clamp((rk - 0.335) / 0.05, 0, 1);
+          const shoulder = clamp((rk - 0.22) / 0.115, 0, 1) * (1 - mask);
           const hsh = ((Math.imul(px, 73856093) ^ Math.imul(py, 19349663)) >>> 0) / 4294967296;
-          const speck = hsh < 0.08 ? 1.35 : hsh > 0.9 ? 0.7 : 0.9 + hsh * 0.2;
-          const rut = rk > 0.72 && rk < 0.8 ? 0.82 : 1;
+          const speck = 0.95 + hsh * 0.1; // fine gravel comes from the detail splat
+          const rut = (rk > 0.43 && rk < 0.46) || (rk > 0.8 && rk < 0.84) ? 0.84 : 1;
           const k = speck * rut * (1 + n2 * 0.12);
           r = r * (1 - mask) + rc[0] * k * mask;
           g = g * (1 - mask) + rc[1] * k * mask;

@@ -8,7 +8,7 @@ import type { Building } from '../Building';
 import type { GameEvents } from '../Events';
 import { resetEntityIds } from '../Entity';
 import { GameMap, ORE_MAX, RICH_MAX, Terrain } from '../GameMap';
-import { generateMap, type MapSpec } from '../MapGen';
+import { bakeHeights, generateMap, type MapSpec } from '../MapGen';
 import { Player } from '../Player';
 import type { Unit } from '../Unit';
 import { World } from '../World';
@@ -245,45 +245,14 @@ export class MapEditor {
       const tx = Math.floor(d.x), tz = Math.floor(d.z);
       if (map.inBounds(tx, tz)) map.doodadBlock[tz * w + tx] = 1;
     }
-    const target = new Float32Array(w * h);
-    for (let z = 0; z < h; z++)
-      for (let x = 0; x < w; x++) {
-        const i = z * w + x;
-        const t = map.terrain[i];
-        let y = (fbm(x * 0.045, z * 0.045, 4, seed + 101) - 0.5) * 1.6;
-        for (const f of this.flats) {
-          const d = Math.hypot(x + 0.5 - f.x, z + 0.5 - f.z);
-          if (d < f.r + 5) y *= Math.max(0, (d - f.r) / 5);
-        }
-        if (t === Terrain.Rock) y = 1.4 + fbm(x * 0.3, z * 0.3, 3, seed + 7) * 1.6;
-        if (t === Terrain.Water) y = -0.9;
-        if (t === Terrain.Sand) y = Math.min(y, 0) - 0.12;
-        if (t === Terrain.Road) y *= 0.8;
-        if (t === Terrain.Concrete) y *= 0.3;
-        target[i] = y;
+    bakeHeights(map, seed, (x, z) => {
+      let k = 1;
+      for (const f of this.flats) {
+        const d = Math.hypot(x - f.x, z - f.z);
+        if (d < f.r + 5) k *= Math.max(0, (d - f.r) / 5);
       }
-    for (let z = 0; z <= h; z++)
-      for (let x = 0; x <= w; x++) {
-        let sum = 0, n = 0, rockN = 0, rockSum = 0, waterN = 0;
-        for (let dz = -1; dz <= 0; dz++)
-          for (let dx = -1; dx <= 0; dx++) {
-            const tx = x + dx, tz = z + dz;
-            if (tx < 0 || tz < 0 || tx >= w || tz >= h) continue;
-            const i = tz * w + tx;
-            sum += target[i];
-            n++;
-            if (map.terrain[i] === Terrain.Rock) {
-              rockN++;
-              rockSum += target[i];
-            }
-            if (map.terrain[i] === Terrain.Water) waterN++;
-          }
-        let y = n ? sum / n : 0;
-        if (rockN === n && n > 0) y = rockSum / rockN;
-        else if (rockN > 0) y = y * 0.6 + (rockSum / rockN) * 0.15;
-        if (waterN > 0 && waterN < n) y = Math.min(y, -0.25);
-        map.heights[z * (w + 1) + x] = y;
-      }
+      return k;
+    });
     map.passVersion++;
     map.oreVersion++;
   }

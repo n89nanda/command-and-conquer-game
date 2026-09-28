@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { Terrain } from '../game/GameMap';
+import { BUILDINGS } from '../data/buildings';
 import type { Game } from '../game/Game';
 import type { Unit } from '../game/Unit';
-import { paletteFor } from '../render/Terrain';
+import { renderTerrain } from './mapimage';
 
 export class Minimap {
   canvas: HTMLCanvasElement;
@@ -10,18 +10,22 @@ export class Minimap {
   private game: Game;
   private base: HTMLCanvasElement;
   private offline: HTMLElement;
+  private offlineKey = '';
+  private offlineT = 0;
   private timer = 0;
   private revealT = 0;
   private wasOnline = false;
   private noise: HTMLCanvasElement;
   private scale: number;
   private dragging = false;
+  private S: number;
 
   constructor(host: HTMLElement, game: Game) {
     this.game = game;
     const map = game.world.map;
     this.canvas = document.createElement('canvas');
     const S = 280 * 2;
+    this.S = S;
     this.canvas.width = S;
     this.canvas.height = S;
     this.scale = S / Math.max(map.w, map.h);
@@ -29,22 +33,16 @@ export class Minimap {
     this.ctx = this.canvas.getContext('2d')!;
     this.offline = document.createElement('div');
     this.offline.className = 'radar-offline';
-    this.offline.innerHTML = '<b>RADAR OFFLINE</b><span>Build a radar structure</span>';
     host.appendChild(this.offline);
-    this.base = this.renderBase();
+    // smooth, hill-shaded terrain (2 px per tile, drawn with smoothing)
+    this.base = renderTerrain(map, Math.max(2, Math.min(4, Math.round(512 / Math.max(map.w, map.h)))), 'natural', false, 1);
     this.noise = document.createElement('canvas');
     this.noise.width = 140;
     this.noise.height = 140;
-    const nav = (e: MouseEvent) => {
-      const r = this.canvas.getBoundingClientRect();
-      const x = ((e.clientX - r.left) / r.width) * (this.canvas.width / this.scale);
-      const z = ((e.clientY - r.top) / r.height) * (this.canvas.height / this.scale);
-      return { x, z };
-    };
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     this.canvas.addEventListener('mousedown', (e) => {
       if (!this.online) return;
-      const p = nav(e);
+      const p = this.nav(e);
       if (e.button === 2 || (e.button === 0 && e.ctrlKey)) {
         const units = game.selection.filter((s): s is Unit => s.kind === 'unit' && s.owner === game.me);
         if (units.length) game.formationMove(units, p.x, p.z, game.mode === 'attackMove');
@@ -59,52 +57,56 @@ export class Minimap {
       this.dragging = true;
       game.jumpTo(p.x, p.z);
     });
-    window.addEventListener('mousemove', (e) => {
-      if (this.dragging) {
-        const p = nav(e);
-        game.jumpTo(p.x, p.z);
-      }
-    });
-    window.addEventListener('mouseup', () => (this.dragging = false));
+    window.addEventListener('mousemove', this.onMove);
+    window.addEventListener('mouseup', this.onUp);
+  }
+
+  private nav(e: MouseEvent) {
+    const r = this.canvas.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * (this.canvas.width / this.scale);
+    const z = ((e.clientY - r.top) / r.height) * (this.canvas.height / this.scale);
+    return { x, z };
+  }
+  private onMove = (e: MouseEvent) => {
+    if (this.dragging) {
+      const p = this.nav(e);
+      this.game.jumpTo(p.x, p.z);
+    }
+  };
+  private onUp = () => (this.dragging = false);
+
+  /** Removes the window listeners (called from Hud.destroy on game end). */
+  destroy() {
+    window.removeEventListener('mousemove', this.onMove);
+    window.removeEventListener('mouseup', this.onUp);
+    this.dragging = false;
+  }
+
+  /** Layout changed (e.g. sidebar collapsed); force a redraw next frame. */
+  resize() {
+    this.timer = 0;
   }
 
   get online() {
     return this.game.me.hasRadar() || this.game.world.fogs.get(this.game.me)?.revealAll === true || this.game.alwaysRadar;
   }
 
-  private renderBase() {
-    const map = this.game.world.map;
-    const pal = paletteFor(map.theater);
-    const c = document.createElement('canvas');
-    c.width = map.w;
-    c.height = map.h;
-    const ctx = c.getContext('2d')!;
-    const img = ctx.createImageData(map.w, map.h);
-    for (let z = 0; z < map.h; z++)
-      for (let x = 0; x < map.w; x++) {
-        const i = z * map.w + x;
-        const t = map.terrain[i];
-        let col: [number, number, number];
-        switch (t) {
-          case Terrain.Rock: col = pal.rock[0]; break;
-          case Terrain.Water: { const w = new THREE.Color(pal.water); col = [w.r * 255, w.g * 255, w.b * 255]; break; }
-          case Terrain.Sand: col = pal.sand[0]; break;
-          case Terrain.Dirt: col = pal.dirt[0]; break;
-          case Terrain.Road: col = pal.road; break;
-          default: col = pal.grass[0];
-        }
-        const h = map.heightAt(x + 0.5, z + 0.5);
-        const shade = 0.85 + Math.max(-0.2, Math.min(0.3, h * 0.12));
-        if (map.doodadBlock[i]) {
-          col = [col[0] * 0.6, col[1] * 0.75, col[2] * 0.6];
-        }
-        img.data[i * 4] = col[0] * shade;
-        img.data[i * 4 + 1] = col[1] * shade;
-        img.data[i * 4 + 2] = col[2] * shade;
-        img.data[i * 4 + 3] = 255;
-      }
-    ctx.putImageData(img, 0, 0);
-    return c;
+  /** Context-aware offline caption: unavailable / low power / build <real radar name>. */
+  private updateOfflineText() {
+    const g = this.game;
+    const me = g.me;
+    const radarId = g.tabItems('structures').find((id) => BUILDINGS[id]?.radar);
+    const hasRadarBuilding = [...me.buildingCounts].some(([id, n]) => n > 0 && BUILDINGS[id]?.radar);
+    let title = 'RADAR OFFLINE', sub = '';
+    if (hasRadarBuilding && me.lowPower) sub = 'Low power: build more power';
+    else if (!radarId) {
+      title = 'RADAR UNAVAILABLE';
+      sub = 'No radar support for this operation';
+    } else sub = `Build a ${BUILDINGS[radarId].name}`;
+    const key = title + sub;
+    if (key === this.offlineKey) return;
+    this.offlineKey = key;
+    this.offline.innerHTML = `<b>${title}</b><span>${sub}</span>`;
   }
 
   update(dt: number) {
@@ -113,16 +115,23 @@ export class Minimap {
     this.offline.style.display = online ? 'none' : 'flex';
     if (online && !this.wasOnline) this.revealT = 0;
     this.wasOnline = online;
+    if (!online) {
+      this.offlineT -= dt;
+      if (this.offlineT <= 0) {
+        this.offlineT = 1;
+        this.updateOfflineText();
+      }
+    } else this.offlineKey = '';
     if (this.timer > 0) return;
-    this.timer = 0.1;
+    this.timer = online && this.revealT < 1.6 ? 1 / 30 : 0.1;
     const ctx = this.ctx;
-    const S = this.canvas.width;
+    const S = this.S;
     if (!online) {
       // static noise
       const nctx = this.noise.getContext('2d')!;
       const img = nctx.createImageData(140, 140);
       for (let i = 0; i < img.data.length; i += 4) {
-        const v = Math.random() * 40;
+        const v = Math.random() * 34;
         img.data[i] = v;
         img.data[i + 1] = v * 1.1;
         img.data[i + 2] = v * 1.2;
@@ -133,29 +142,31 @@ export class Minimap {
       ctx.drawImage(this.noise, 0, 0, S, S);
       return;
     }
-    this.revealT += 0.1;
     const g = this.game;
     const w = g.world;
     const map = w.map;
     const sc = this.scale;
-    ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, S, S);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(this.base, 0, 0, map.w * sc, map.h * sc);
-    // ore
+    // ore (live: fields deplete and regrow)
+    ctx.globalAlpha = 0.85;
     for (let i = 0; i < map.ore.length; i++) {
-      if (!map.oreType[i]) continue;
-      ctx.fillStyle = map.oreType[i] === 2 ? '#9a70ff' : '#3fe0a8';
-      ctx.fillRect((i % map.w) * sc, Math.floor(i / map.w) * sc, sc, sc);
+      if (!map.oreType[i] || map.ore[i] <= 0) continue;
+      ctx.fillStyle = map.oreType[i] === 2 ? '#a07cff' : '#3fe0a8';
+      ctx.fillRect((i % map.w) * sc + sc * 0.1, Math.floor(i / map.w) * sc + sc * 0.1, sc * 0.8, sc * 0.8);
     }
+    ctx.globalAlpha = 1;
     const fog = w.fogs.get(g.me);
     // buildings
+    ctx.lineWidth = 1;
     for (const b of w.buildings) {
       if (!w.visibleTo(b, g.me)) continue;
       ctx.fillStyle = b.owner.isNeutral ? '#9a9a9a' : '#' + new THREE.Color(b.owner.color).getHexString();
       ctx.fillRect(b.tx * sc, b.tz * sc, b.w * sc, b.h * sc);
-      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.65)';
       ctx.strokeRect(b.tx * sc + 0.5, b.tz * sc + 0.5, b.w * sc - 1, b.h * sc - 1);
     }
     // units
@@ -185,21 +196,25 @@ export class Minimap {
     // objective beacons
     for (const bc of g.beacons) {
       if (bc.entity?.dead) continue;
+      const bx = bc.entity ? bc.entity.x : bc.x, bz = bc.entity ? bc.entity.z : bc.z;
       const k = (w.time * 1.2) % 1;
       ctx.strokeStyle = bc.color ?? '#ffd24a';
       ctx.globalAlpha = 1 - k;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(bc.x * sc, bc.z * sc, 5 + k * 18, 0, Math.PI * 2);
+      ctx.arc(bx * sc, bz * sc, 5 + k * 18, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
       ctx.fillStyle = bc.color ?? '#ffd24a';
-      ctx.fillRect(bc.x * sc - 3, bc.z * sc - 3, 6, 6);
+      ctx.fillRect(bx * sc - 3, bz * sc - 3, 6, 6);
     }
     // camera frustum
     const r = g.renderer;
     const corners = [
-      [-1, 1], [1, 1], [1, -1], [-1, -1],
+      [-1, 1],
+      [1, 1],
+      [1, -1],
+      [-1, -1],
     ].map(([x, y]) => r.pickGround(x, y));
     if (corners.every((c) => c)) {
       ctx.strokeStyle = 'rgba(255,255,255,0.85)';
@@ -213,13 +228,23 @@ export class Minimap {
       ctx.closePath();
       ctx.stroke();
     }
-    // radar coming online sweep
-    if (this.revealT < 1.5) {
-      const k = this.revealT / 1.5;
-      ctx.fillStyle = `rgba(0,0,0,${1 - k})`;
-      ctx.fillRect(0, S * k, S, S * (1 - k));
-      ctx.fillStyle = 'rgba(120,255,160,0.6)';
-      ctx.fillRect(0, S * k - 2, S, 3);
+    // radar coming online: a soft sweep band that fades out completely
+    if (this.revealT < 1.6) {
+      this.revealT += this.timer;
+      const k = Math.min(1, this.revealT / 1.4);
+      const y = S * k;
+      ctx.fillStyle = `rgba(0,0,0,${0.85 * (1 - k)})`;
+      ctx.fillRect(0, y, S, S - y);
+      const fade = 1 - Math.max(0, (this.revealT - 1.1) / 0.5);
+      if (fade > 0) {
+        const grad = ctx.createLinearGradient(0, y - 60, 0, y);
+        grad.addColorStop(0, 'rgba(120,255,170,0)');
+        grad.addColorStop(1, `rgba(120,255,170,${0.35 * fade})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, y - 60, S, 60);
+        ctx.fillStyle = `rgba(180,255,200,${0.7 * fade})`;
+        ctx.fillRect(0, y - 1, S, 2);
+      }
     }
   }
 

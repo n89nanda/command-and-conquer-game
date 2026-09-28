@@ -144,7 +144,8 @@ function injectFow(m: THREE.Material, u: FogOfWar['uniforms']) {
           vec3 fogged = mix(gl_FragColor.rgb, vec3(dot(gl_FragColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(0.8, 0.85, 1.0), 0.5 * (1.0 - smoothstep(0.5, 1.0, fv)));
           vec3 shroud = uShroudCol * (0.8 + 0.4 * fn);
           #ifdef TONE_MAPPING
-            shroud = pow(shroud, vec3(0.4545)); // rendering straight to screen: output is display-referred
+            // rendering straight to screen: output is display-referred sRGB
+            shroud = mix(shroud * 12.92, 1.055 * pow(shroud, vec3(0.41667)) - 0.055, step(vec3(0.0031308), shroud));
           #endif
           gl_FragColor.rgb = fogged * lit + shroud * (1.0 - smoothstep(0.0, 0.5, fv));
         }`,
