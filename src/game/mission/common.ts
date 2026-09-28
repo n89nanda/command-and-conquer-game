@@ -458,9 +458,19 @@ export abstract class CampaignScript extends MissionScript {
     this.unsubs.push(this.world.events.on(k, fn as never));
   }
 
-  /** Units of `p` that are idle (not given scripted orders) seek out `targets` every few seconds. */
+  /** Idle units of `p` tagged 'hunter' (wave() does this) seek out `targets` every few seconds. */
   hunt(p: Player, targets: Player[] = [this.me], every = 4) {
+    const ex = this.hunters.find((h) => h.p === p);
+    if (ex) {
+      ex.targets = targets;
+      ex.every = every;
+      return;
+    }
     this.hunters.push({ p, targets, timer: every * 0.5, every });
+  }
+
+  stopHunt(p: Player) {
+    this.hunters = this.hunters.filter((h) => h.p !== p);
   }
 
   private huntTick(p: Player, targets: Player[]) {
@@ -468,7 +478,7 @@ export abstract class CampaignScript extends MissionScript {
     for (const u of this.world.units) {
       if (u.dead || u.owner !== p || u.weapons.length === 0 || u.def.harvester) continue;
       if (u.order.type !== 'idle' || u.target) continue;
-      if (u.tag === 'guard' || u.tag === 'hold') continue;
+      if (u.tag !== 'hunter') continue;
       // nearest target entity (units first, buildings as fallback)
       let best: { x: number; z: number } | null = null;
       let bd = Infinity;
@@ -493,11 +503,27 @@ export abstract class CampaignScript extends MissionScript {
   }
 
   /** Spawn an attack group at `from` that attack-moves to `to` (then hunts if the owner hunts). */
-  wave(p: Player, ids: string[], from: Pt, to: Pt, tag = ''): Unit[] {
+  wave(p: Player, ids: string[], from: Pt, to: Pt, tag = 'hunter'): Unit[] {
     const us = this.spawn(p, ids, from.x, from.z, Math.atan2(to.z - from.z, to.x - from.x), 1.2);
     for (const u of us) u.tag = tag;
     this.attackMove(us, to.x, to.z);
     return us;
+  }
+
+  /** Units walk a loop of waypoints (attack-moving), pausing briefly at each. */
+  patrol(units: Unit[], points: Pt[], pause = 4) {
+    let i = 0;
+    let wait = 0;
+    for (const u of units) u.tag = 'patrol';
+    this.every(1, () => {
+      const alive = units.filter((u) => !u.dead && u.tag === 'patrol');
+      if (!alive.length) return;
+      if (alive.some((u) => u.target || u.order.type !== 'idle')) return;
+      if (wait-- > 0) return;
+      wait = pause;
+      i = (i + 1) % points.length;
+      this.attackMove(alive, points[i].x, points[i].z);
+    });
   }
 
   /** Units standing guard: they engage what comes near but are never sent hunting. */
@@ -505,6 +531,23 @@ export abstract class CampaignScript extends MissionScript {
     const us = this.spawn(p, ids, x, z);
     for (const u of us) u.tag = 'guard';
     return us;
+  }
+
+  /** Restrict the human's build options to exactly these ids (plus tech limit). Empty list = no sidebar. */
+  allowOnly(ids: string[], techLimit = 99) {
+    const allowed = new Set(ids);
+    const all = [...Object.values(UNITS), ...Object.values(BUILDINGS)];
+    for (const d of all) if (d.faction === this.me.faction && !allowed.has(d.id)) this.me.restricted.add(d.id);
+    for (const id of ids) {
+      if (!UNITS[id] && !BUILDINGS[id]) throw new Error('allowOnly: unknown id ' + id);
+      this.me.restricted.delete(id);
+    }
+    this.me.techLimit = techLimit;
+  }
+
+  /** Kill enemy units (not buildings) within r of a point — cheat helper. */
+  cheatClear(x: number, z: number, r: number) {
+    for (const p of this.enemyPlayers()) for (const u of this.unitsInArea(p, x, z, r)) this.world.kill(u, null);
   }
 
   /** Human's combat-capable forces (for defeat checks). */

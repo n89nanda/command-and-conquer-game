@@ -208,7 +208,7 @@ export class BasePlanner {
     const def = BUILDINGS[defId];
     if (!def) return null;
     const [bw, bh] = def.footprint;
-    const own = world.buildings.filter((b) => !b.dead && b.owner === this.player && !b.def.wall);
+    const own = world.buildings.filter((b) => !b.dead && b.owner === this.player && !b.def.wall && b.def.faction !== 'both');
     if (own.length === 0) return null;
     this.buildMasks(own);
     const isSmall = bw === 1 && bh === 1;
@@ -317,8 +317,6 @@ export class BasePlanner {
 
     // baseline reachability
     const before = this.flood(-99, -99, 0, 0);
-    const reachBefore = new Uint8Array(0);
-    void reachBefore;
     let tested = 0;
     for (const c of cands) {
       if (tested >= 30) break;
@@ -357,7 +355,7 @@ export class BasePlanner {
           for (let xx = tx - 1; xx <= tx + 3; xx++) {
             const inner = xx >= tx && xx < tx + 3 && zz >= tz && zz < tz + 3;
             if (inner) {
-              if (!m.buildable(xx, zz) || this.world.padAt(xx, zz)) {
+              if (!m.buildable(xx, zz) || this.world.padAt(xx, zz) || this.world.isReserved(xx, zz)) {
                 ok = false;
                 break;
               }

@@ -81,6 +81,8 @@ export class EntityViews {
         if (e.kind === 'building') o.receiveShadow = true;
       }
     });
+    // infantry are drawn slightly larger than life for readability at RTS zoom
+    if (e.kind === 'unit' && (e as Unit).def.category === 'infantry') model.root.scale.setScalar(1.2);
     this.group.add(model.root);
     const v: View = {
       e, model, ring: null, lastHp: e.hp, flash: 0, smokeT: Math.random(), visible: true, stealthApplied: false, owner: e.owner,

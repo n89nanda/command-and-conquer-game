@@ -37,7 +37,7 @@ interface MatchResult {
   winner: Player | null;
   winnerIdx: number;
   duration: number;
-  players: { name: string; faction: FactionId; diff: Difficulty; defeatedAt: number; stats: Player['stats']; ai: SkirmishAI; aiMs: number; aiMaxMs: number }[];
+  players: { name: string; faction: FactionId; diff: Difficulty; defeatedAt: number; stats: Player['stats']; ai: SkirmishAI; aiMs: number; aiMaxMs: number; aiSlow: number }[];
   simMs: number;
   ticks: number;
   error?: string;
@@ -89,6 +89,7 @@ function runMatch(setup: MatchSetup): MatchResult {
   const ais: SkirmishAI[] = [];
   const aiMs: number[] = active.map(() => 0);
   const aiMax: number[] = active.map(() => 0);
+  const aiSlow: number[] = active.map(() => 0);
   active.forEach((p, i) => {
     const ai = new SkirmishAI(world, p, players[i].difficulty);
     if (setup.log) ai.log = (m) => console.log('   ' + m);
@@ -100,6 +101,7 @@ function runMatch(setup: MatchSetup): MatchResult {
         const e = performance.now() - t;
         aiMs[i] += e;
         if (e > aiMax[i]) aiMax[i] = e;
+        if (e > 4) aiSlow[i]++;
       },
     };
   });
@@ -186,7 +188,7 @@ function runMatch(setup: MatchSetup): MatchResult {
     winnerIdx: winner ? active.indexOf(winner) : -1,
     duration: world.time,
     players: active.map((p, i) => ({
-      name: p.name, faction: p.faction, diff: players[i].difficulty, defeatedAt: defeatedAt[i], stats: p.stats, ai: ais[i], aiMs: aiMs[i], aiMaxMs: aiMax[i],
+      name: p.name, faction: p.faction, diff: players[i].difficulty, defeatedAt: defeatedAt[i], stats: p.stats, ai: ais[i], aiMs: aiMs[i], aiMaxMs: aiMax[i], aiSlow: aiSlow[i],
     })),
     simMs,
     ticks: tick,
@@ -264,7 +266,25 @@ if (results.length > 1) {
   const dWins: Record<string, number> = {};
   for (const r of dmix) dWins[r.players[r.winnerIdx].diff] = (dWins[r.players[r.winnerIdx].diff] ?? 0) + 1;
   console.log(`difficulty wins (mixed difficulty, ${dmix.length} games):`, dWins);
-  let ms = 0, ticks = 0, maxMs = 0, thinkMs = 0, thinks = 0;
+  const pairs = new Map<string, Record<string, number>>();
+  for (const r of results) {
+    const key = [...new Set(r.players.map((p) => p.diff))].sort().join(' vs ');
+    const rec = pairs.get(key) ?? {};
+    const w = r.winner ? r.players[r.winnerIdx].diff : 'none';
+    rec[w] = (rec[w] ?? 0) + 1;
+    pairs.set(key, rec);
+  }
+  for (const [k, v] of pairs) console.log(`  ${k.padEnd(18)}`, v);
+  const byPair = new Map<string, number[]>();
+  for (const r of decided) {
+    const key = [...new Set(r.players.map((p) => p.diff))].sort().join(' vs ');
+    (byPair.get(key) ?? byPair.set(key, []).get(key)!).push(r.duration / 60);
+  }
+  for (const [k, v] of byPair) {
+    v.sort((a, b) => a - b);
+    console.log(`  duration ${k.padEnd(18)} median ${v[Math.floor(v.length / 2)].toFixed(1)} min (range ${v[0].toFixed(1)}-${v[v.length - 1].toFixed(1)})`);
+  }
+  let ms = 0, ticks = 0, maxMs = 0, thinkMs = 0, thinks = 0, slow = 0;
   for (const r of results)
     for (const p of r.players) {
       ms += p.aiMs;
@@ -272,6 +292,7 @@ if (results.length > 1) {
       maxMs = Math.max(maxMs, p.aiMaxMs);
       thinkMs += p.ai.stats.thinkMs;
       thinks += p.ai.stats.thinks;
+      slow += p.aiSlow;
     }
-  console.log(`AI cost per player: avg ${(ms / Math.max(1, ticks)).toFixed(4)} ms/tick, avg ${(thinkMs / Math.max(1, thinks)).toFixed(3)} ms/think, worst single tick ${maxMs.toFixed(1)} ms`);
+  console.log(`AI cost per player: avg ${(ms / Math.max(1, ticks)).toFixed(4)} ms/tick, avg ${(thinkMs / Math.max(1, thinks)).toFixed(3)} ms/think, worst single tick ${maxMs.toFixed(1)} ms, ticks over 4 ms: ${slow} of ${ticks}`);
 }
