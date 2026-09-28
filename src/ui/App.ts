@@ -573,7 +573,7 @@ export class App {
       const spec = SKIRMISH_MAPS.find((m) => m.id === s.mapId) ?? SKIRMISH_MAPS[0];
       info.innerHTML = `<div class="mi-t"><b>${spec.name}</b><span>${spec.players} PLAYERS · ${spec.theater.toUpperCase()} · ${spec.w}×${spec.h}</span></div>
         <p>${spec.description}</p>
-        <div class="mi-legend"><i class="dia"></i>Numbered diamonds mark start positions. Yours is assigned at random.</div>`;
+        <div class="mi-legend"><i class="dia"></i>Diamonds mark start positions (yours is random).</div>`;
     };
     const renderMaps = () => {
       for (const [id, c] of mapCards) c.classList.toggle('sel', id === s.mapId);

@@ -315,7 +315,7 @@ export class Hud {
     this.minimap.update(dt);
     this.commandoT -= dt;
     if (this.commandoT <= 0) {
-      this.commandoT = 1;
+      this.commandoT = 0.25;
       this.updateCommando();
     }
     // credits count-up

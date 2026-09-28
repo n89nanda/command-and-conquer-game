@@ -114,6 +114,7 @@ export class Minimap {
     const online = this.online;
     this.offline.style.display = online ? 'none' : 'flex';
     if (online && !this.wasOnline) this.revealT = 0;
+    else if (online) this.revealT += dt; // time-based, independent of redraw rate
     this.wasOnline = online;
     if (!online) {
       this.offlineT -= dt;
@@ -230,7 +231,6 @@ export class Minimap {
     }
     // radar coming online: a soft sweep band that fades out completely
     if (this.revealT < 1.6) {
-      this.revealT += this.timer;
       const k = Math.min(1, this.revealT / 1.4);
       const y = S * k;
       ctx.fillStyle = `rgba(0,0,0,${0.85 * (1 - k)})`;

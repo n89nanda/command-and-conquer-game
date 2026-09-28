@@ -1218,7 +1218,7 @@ export class Game {
         }
         if (b.def.id === 'n_derrick' && b.owner.isNeutral && selected) {
           ctx.fillStyle = '#ffd76a';
-          ctx.font = '600 12px ' + UI_FONT;
+          ctx.font = '600 12px ' + uiFontFamily();
           ctx.textAlign = 'center';
           ctx.fillText('CAPTURE WITH ENGINEER', (minX + maxX) / 2, maxY + 14);
         }
@@ -1243,7 +1243,7 @@ export class Game {
         for (const [n, ids] of this.groups) {
           if (ids.includes(u.id)) {
             ctx.fillStyle = '#ffffff';
-            ctx.font = '700 10px ' + UI_FONT;
+            ctx.font = '700 10px ' + uiFontFamily();
             ctx.textAlign = 'left';
             ctx.fillText(String(n), x - bw / 2 - 9, y + 4);
             break;
@@ -1323,7 +1323,7 @@ export class Game {
         ctx.restore();
         if (b.label) {
           const dist = Math.round(Math.hypot(b.x - rig.targetX, b.z - rig.targetZ));
-          ctx.font = '700 12px ' + UI_FONT;
+          ctx.font = '700 12px ' + uiFontFamily();
           ctx.textAlign = 'center';
           ctx.fillStyle = '#000';
           ctx.fillText(`${b.label} ${dist}m`, ax - dx * 26 + 1, ay - dy * 22 + 5);
@@ -1358,7 +1358,7 @@ export class Game {
       ctx.stroke();
       ctx.globalAlpha = 1;
       if (b.label) {
-        ctx.font = '700 12px ' + UI_FONT;
+        ctx.font = '700 12px ' + uiFontFamily();
         ctx.textAlign = 'center';
         ctx.fillStyle = '#000';
         ctx.fillText(b.label, bx + 1, by - 17);
@@ -1522,7 +1522,7 @@ function drawIcon(ctx: CanvasRenderingContext2D, x: number, y: number, kind: 'wr
   if (kind === 'wrench') {
     ctx.globalAlpha = 0.6 + Math.sin(t * 6) * 0.4;
     ctx.fillStyle = '#ffd24a';
-    ctx.font = '700 13px ' + UI_FONT;
+    ctx.font = '700 13px ' + uiFontFamily();
     ctx.textAlign = 'center';
     ctx.fillText('🔧', x, y);
     ctx.globalAlpha = 1;
@@ -1549,16 +1549,18 @@ const CURSORS: Record<string, string> = {
   place: 'crosshair',
 };
 
-/** Canvas can't use CSS variables: resolve the UI font family once. */
-const UI_FONT = (() => {
-  try {
-    const v = getComputedStyle(document.documentElement).getPropertyValue('--ui-font').trim();
-    return v || 'sans-serif';
-  } catch {
-    return 'sans-serif';
+/** Canvas can't use CSS variables: resolve the UI font family (lazily, after CSS has loaded). */
+let uiFontCache = '';
+function uiFontFamily() {
+  if (!uiFontCache) {
+    try {
+      uiFontCache = getComputedStyle(document.documentElement).getPropertyValue('--ui-font').trim() || 'sans-serif';
+    } catch {
+      uiFontCache = 'sans-serif';
+    }
   }
-})();
-
+  return uiFontCache;
+}
 const IS_MAC = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC');
 /** Rewrites mouse/PC wording in tips for Mac trackpad players. */
 export function platformText(html: string, trackpad: boolean): string {

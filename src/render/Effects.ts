@@ -1032,8 +1032,8 @@ export class Effects {
       this.add.spawn({
         x: x + Math.cos(a) * 0.3 * s * Math.random(), y: fy + (0.1 + Math.random() * 0.3) * s, z: z + Math.sin(a) * 0.3 * s * Math.random(),
         vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp * 0.7 + 0.9 * s, vz: Math.sin(a) * Math.cos(e) * sp,
-        life: (0.36 + Math.random() * 0.32) * (0.75 + 0.25 * s), size: (1.1 + Math.random() * 0.6) * s, size1: 0.35 * s, se: 1.6,
-        r: 3.0, g: 1.3, b: 0.35, r1: 0.35, g1: 0.04, b1: 0.0, a: 0.44, a1: 0, ce: 0.45, ae: 0.85,
+        life: (0.45 + Math.random() * 0.4) * (0.75 + 0.25 * s), size: (1.1 + Math.random() * 0.6) * s, size1: 0.4 * s, se: 1.3,
+        r: 3.0, g: 1.3, b: 0.35, r1: 0.4, g1: 0.05, b1: 0.0, a: 0.45, a1: 0, ce: 0.5,
         tex: pick(TEX.flame, TEX.flame2), drag: 3.2, vrot: rs() * 4,
       });
     }
