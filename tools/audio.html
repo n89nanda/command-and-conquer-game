@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RIFTFALL Audio Lab</title>
+  <style>
+    :root { --bg: #0d1014; --panel: #161b22; --line: #2a323d; --fg: #d6dde6; --dim: #7d8a99; --acc: #e0a030; --acc2: #4fb0e0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; }
+    header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    h1 { font-size: 18px; margin: 0; letter-spacing: 2px; color: var(--acc); }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--dim); margin: 0 0 10px; }
+    main { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; padding: 14px 20px; }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+    .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    button { background: #222a34; color: var(--fg); border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px; cursor: pointer; font: inherit; font-size: 13px; }
+    button:hover { border-color: var(--acc2); }
+    button.on { background: #3a2c10; border-color: var(--acc); color: #ffd58a; }
+    button.big { padding: 8px 16px; font-weight: 600; }
+    label { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: var(--dim); }
+    label span { width: 70px; }
+    input[type=range] { flex: 1; }
+    pre { background: #0a0d10; padding: 8px; border-radius: 5px; overflow: auto; max-height: 260px; font-size: 12px; margin: 8px 0 0; }
+    table { border-collapse: collapse; width: 100%; font-size: 12px; }
+    td, th { padding: 2px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+    td:first-child, th:first-child { text-align: left; }
+    .hint { color: var(--dim); font-size: 12px; }
+    #status { color: var(--acc2); font-family: ui-monospace, monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>RIFTFALL · AUDIO LAB</h1>
+    <button id="unlock" class="big">Unlock audio</button>
+    <span id="status">locked</span>
+  </header>
+  <main id="app"></main>
+  <script type="module" src="./audio.ts"></script>
+</body>
+</html>
