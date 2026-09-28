@@ -70,6 +70,7 @@ class Foothold extends CampaignScript {
       this.hint('<b>Harvesters</b> work on their own. Protect them: no harvesters, no credits.<br>Build a <b>Barracks</b> to train infantry, then a <b>War Factory</b> for Guardian tanks. Click a unit icon several times to queue more.');
       this.after(8, () => {
         this.objective('destroy', 'Destroy the Covenant base at Vadu Crossing.');
+        this.beacon('destroy', ENEMY, 'VADU CROSSING', '#ff6a4a');
         this.reveal(ENEMY.x, ENEMY.z, 7);
       });
     });
@@ -86,6 +87,9 @@ class Foothold extends CampaignScript {
     this.after(170, () => {
       this.objective('derricks', 'Capture the two oil derricks with Field Engineers.', true);
       for (const d of DERRICKS) this.reveal(d.x + 1, d.z + 1, 3);
+      this.r.derricks.forEach((d, i) => {
+        if (d.owner !== me) this.beacon('derricks:' + i, d, 'OIL DERRICK', '#9fd8ff');
+      });
       this.say('Two oil derricks in the valley, abandoned when the Rift came. Put an engineer in each and they pay for themselves.', 'intel');
     });
     this.when(() => this.r.derricks.every((d) => d.owner === me), () => {
@@ -93,6 +97,8 @@ class Foothold extends CampaignScript {
       this.complete('derricks');
     });
     this.on('captured', (e) => {
+      const di = this.r.derricks.indexOf(e.building);
+      if (di >= 0 && e.to === me) this.clearBeacon('derricks:' + di);
       if (e.to === cov && e.building.def.id === 'n_derrick') this.say('The Covenant took one of the derricks. Take it back.', 'intel');
     });
 
@@ -116,6 +122,7 @@ class Foothold extends CampaignScript {
       this.say('Commander, a Covenant MCV and escort just crossed the eastern ridge. They are heading for the rich field in the valley.', 'intel');
       this.say('If that MCV deploys we will have two bases to dig out. Stop it.', 'commander');
       this.convoy = this.spawn(raiders, ['c_mcv', 'scorpion', 'scorpion', 'acolyte', 'acolyte'], CONVOY_FROM.x, CONVOY_FROM.z);
+      if (this.convoy[0]) this.beacon('convoy', this.convoy[0], 'COVENANT MCV', '#ff6a4a');
       for (const u of this.convoy) u.tag = 'hold';
       this.attackMove(this.convoy.filter((u) => !u.def.mcv), CENTER.x + 2, CENTER.z);
       this.convoy[0].issue({ type: 'move', x: CENTER.x, z: CENTER.z }, this.world);

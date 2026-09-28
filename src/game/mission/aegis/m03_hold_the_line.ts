@@ -38,6 +38,7 @@ class HoldTheLine extends CampaignScript {
     const { me, strike, relay } = this.r;
     this.allowOnly(['a_power', 'a_refinery', 'a_barracks', 'a_factory', 'a_radar', 'a_repair', 'a_tower', 'a_turret', 'a_sam', 'a_wall', 'rifleman', 'rocketeer', 'a_engineer', 'scout', 'guardian', 'tempest', 'a_harvester'], 2);
     this.objective('relay', 'The Skyhook relay must survive.');
+    this.beacon('relay', relay, 'SKYHOOK RELAY', '#6aff8a');
     this.objective('hold', 'Hold Havnvik until the evacuation is complete.');
     this.loseWhenWiped('Havnvik has fallen.');
     this.countdown('EVACUATION', EVAC_TIME, () => this.evacDone());
@@ -143,6 +144,7 @@ class HoldTheLine extends CampaignScript {
       ['intel', 'Northern fleet is sending armour and two Tempest batteries. Use the rockets on their defences, from range.'],
     ], 1);
     this.objective('svartdal', 'Destroy the Covenant staging base at Svartdal.');
+    this.beacon('svartdal', ENEMY, 'SVARTDAL', '#ff6a4a');
     this.reveal(ENEMY.x, ENEMY.z, 10);
     this.reinforce(me, ['guardian', 'guardian', 'guardian', 'tempest', 'tempest'], BASE.x - 14, 3, BASE.x - 6, BASE.z + 8);
     this.after(6, () => this.hint('<b>Tempest MLRS</b> out-range every defence. Park them behind your tanks and let them bombard. Keep them away from bikes.', 14));

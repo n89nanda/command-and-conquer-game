@@ -2554,6 +2554,7 @@ export class SkirmishAI {
   // ================================================================== superweapons
   private superweapons() {
     this.lastSW = this.now;
+    if (!this.allowSW) return; // missions may hand the AI a superweapon it must never fire
     const p = this.player;
     for (const sw of p.superweapons.values()) {
       if (!sw.ready) continue;

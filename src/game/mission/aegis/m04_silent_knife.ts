@@ -48,6 +48,7 @@ class SilentKnife extends CampaignScript {
     for (const p of this.r.patrols) this.patrol(p.units, p.route, 5);
     this.objective('okafor', 'Captain Okafor must survive.');
     this.objective('power', 'Black out the compound: destroy the Rift Generators west of the walls.');
+    this.beacon('power', GEN, 'RIFT GENERATORS', '#ff6a4a');
     this.reveal(GEN.x, GEN.z, 6);
     this.reveal(COMPOUND.x, COMPOUND.z, 5);
     this.dialogue([
@@ -80,6 +81,7 @@ class SilentKnife extends CampaignScript {
     this.after(90, () => {
       this.say('Captain, thermal shows people in a pen on the east side of the compound. Could be Recon Team Hammer. They went missing in March.', 'intel');
       this.objective('hammer', 'Free the prisoners held in the stockade.', true);
+      if (!this.freed) this.beacon('hammer', STOCKADE, 'STOCKADE', '#9fd8ff');
       this.reveal(STOCKADE.x, STOCKADE.z, 3);
     });
     this.when(() => !this.freed && this.alive(this.r.stockadeGuards).length === 0 && this.anyNear(me, STOCKADE.x, STOCKADE.z, 4), () => {
@@ -118,6 +120,7 @@ class SilentKnife extends CampaignScript {
       ['ally', 'Moving in. Engineers, stay on my six.'],
     ]);
     this.objective('array', 'Capture the Oracle Array with a Field Engineer.');
+    this.beacon('array', array, 'ORACLE ARRAY');
     this.hint('Select an <b>Engineer</b> and <b>right-click</b> the Oracle Array to capture it. Clear the guards first: engineers are unarmed.', 16);
   }
 
@@ -134,6 +137,7 @@ class SilentKnife extends CampaignScript {
     ]);
     this.after(12, () => {
       this.objective('evac', 'Get Captain Okafor to extraction point Zulu.');
+      this.beacon('evac', EVAC, 'EXTRACTION', '#6aff8a');
       this.reveal(EVAC.x, EVAC.z, 5);
       this.countdown('EXTRACTION', 300, () => {
         this.fail('evac');

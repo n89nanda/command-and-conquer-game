@@ -39,6 +39,7 @@ class FirstLight extends CampaignScript {
     this.allowOnly([]);
     this.loseWhenWiped('Squad Vanguard has been wiped out.');
     this.objective('camp', 'Reach the Kessel survey camp.');
+    this.beacon('camp', CAMP, 'SURVEY CAMP');
     this.reveal(CAMP.x, CAMP.z, 5);
     const t = this.dialogue([
       ['commander', 'Captain Okafor, you are on the ground. Survey Team Kestrel went dark six hours ago.'],
@@ -72,6 +73,7 @@ class FirstLight extends CampaignScript {
       if (this.isComplete('wreck')) return;
       this.say('Commander, a Hawk went down south-west of the camp two days ago. Its gun camera may still be intact.', 'intel');
       this.objective('wreck', 'Recover the flight recorder from the downed Hawk.', true);
+      this.beacon('wreck', WRECK, 'DOWNED HAWK', '#9fd8ff');
       this.reveal(WRECK.x, WRECK.z, 4);
     });
     this.when(() => this.anyNear(this.me, WRECK.x, WRECK.z, 3), () => {
@@ -114,6 +116,7 @@ class FirstLight extends CampaignScript {
     ]);
     this.after(t - 2, () => {
       this.objective('outpost', 'Destroy the Covenant outpost across the Kessel river.');
+      this.beacon('outpost', OUTPOST, 'COVENANT OUTPOST', '#ff6a4a');
       this.reveal(BRIDGE.x, BRIDGE.z, 4);
       this.reinforce(me, ['guardian', 'guardian', 'guardian', 'rifleman', 'rifleman'], 20, 3, CAMP.x - 5, CAMP.z + 2);
       this.hint(
