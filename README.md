@@ -38,12 +38,14 @@ npm run build:single   # rebuilds release-style single file into dist-single/ind
 | Deploy MCV | `D`, or double-click the MCV |
 | Control groups | ⌘ or Ctrl + `1`–`9` to assign, `1`–`9` to select (double tap to jump) |
 | Select army on screen / everywhere | `Q` / `E` |
-| Scroll | Arrow keys, screen edges, or middle-drag |
-| Zoom | Two-finger scroll or pinch |
+| Scroll | Two-finger swipe (trackpad mode), arrow keys, screen edges, or middle-drag |
+| Zoom | Pinch (or mouse wheel with trackpad mode off in Options) |
 | Jump to last alert / base | `Space` / `H` |
 | Sell / Repair mode | `Z` / `R` |
 | Cycle build tabs | `Tab` |
 | Pause menu | `Esc` or `P` |
+| Transmission log | `L` |
+| Objectives | `O` (click an objective to jump to it) |
 | Game speed | `+` / `-` |
 
 ## Playing tips
