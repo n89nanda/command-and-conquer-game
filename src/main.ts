@@ -1,0 +1,10 @@
+import * as THREE from 'three';
+const r = new THREE.WebGLRenderer({ antialias: true });
+r.setSize(innerWidth, innerHeight);
+document.body.appendChild(r.domElement);
+const s = new THREE.Scene();
+const c = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+c.position.set(3, 3, 3); c.lookAt(0, 0, 0);
+s.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ color: 0x44aa88 })));
+s.add(new THREE.DirectionalLight(0xffffff, 3));
+r.render(s, c);
